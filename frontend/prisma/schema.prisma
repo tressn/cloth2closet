@@ -1,0 +1,383 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  DRESSMAKER
+  ADMIN
+}
+
+enum ProjectStatus {
+  DRAFT
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  READY_TO_SHIP
+  SHIPPED
+  COMPLETED
+  CANCELED
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD
+  REQUIRES_CONFIRMATION
+  REQUIRES_ACTION
+  PROCESSING
+  SUCCEEDED
+  CANCELED
+  FAILED
+  REFUNDED
+}
+
+enum MilestoneStatus {
+  PENDING
+  INVOICED
+  PAID
+  RELEASED
+  CANCELED
+}
+
+enum TransferStatus {
+  PENDING
+  PAID_OUT
+  FAILED
+  REVERSED
+}
+
+enum AttireType {
+  DRESS
+  SUIT
+  TOP
+  SKIRT
+  PANTS
+  OUTERWEAR
+  TRADITIONAL
+  OTHER
+}
+
+//// CORE MODELS ////
+
+model User {
+  id    String @id @default(cuid())
+  email String @unique
+  role  Role   @default(CUSTOMER)
+
+  // Optional 1:1 profiles (only one will usually exist depending on role)
+  customerProfile   CustomerProfile?
+  dressmakerProfile DressmakerProfile?
+
+  // Relations
+  sentMessages Message[]
+
+  // Projects where this user is the customer
+  customerProjects   Project[] @relation("CustomerProjects")
+  // Projects where this user is the dressmaker
+  dressmakerProjects Project[] @relation("DressmakerProjects")
+
+  // Conversations
+  customerConversations   Conversation[] @relation("CustomerConversations")
+  dressmakerConversations Conversation[] @relation("DressmakerConversations")
+
+  // Measurements
+  measurements Measurement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileAssets FileAsset[]
+}
+
+model CustomerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Example starter fields (optional but common)
+  fullName   String?
+  phone      String?
+  timezone   String?
+  address1   String?
+  address2   String?
+  city       String?
+  region     String?
+  postalCode String?
+  country    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DressmakerProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // “detailed attributes”
+  displayName     String?
+  bio             String?
+  location        String? // e.g., "Brooklyn, NY"
+  languages       String[] // Postgres array: ["en", "es"]
+  basePriceFrom   Int? // store cents? or whole currency units (see note below)
+  currency        String   @default("USD")
+  yearsExperience Int?
+  specialties     String[] // e.g., ["bridal", "eveningwear"]
+  websiteUrl      String?
+  instagramHandle String?
+
+  // Portfolio items
+  portfolioItems PortfolioItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PortfolioItem {
+  id           String @id @default(cuid())
+  dressmakerId String
+
+  dressmaker DressmakerProfile @relation(fields: [dressmakerId], references: [id], onDelete: Cascade)
+
+  title      String
+  attireType AttireType @default(OTHER)
+  tags       String[] // ["silk", "bridal", "hand-stitched", "embroidery"]
+  imageUrls  String[] // ["https://...","https://..."]
+
+  // optional: extra metadata
+  description String?
+  isFeatured  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileAssets FileAsset[]
+
+  @@index([dressmakerId])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  projectCode String        @unique
+  status      ProjectStatus @default(REQUESTED)
+
+  customerId   String
+  dressmakerId String
+
+  customer   User @relation("CustomerProjects", fields: [customerId], references: [id], onDelete: Restrict)
+  dressmaker User @relation("DressmakerProjects", fields: [dressmakerId], references: [id], onDelete: Restrict)
+
+  details    ProjectDetails?
+  payment    Payment?
+  milestones Milestone[]
+  review     Review?
+
+  // Conversations can optionally link to a project
+  conversations Conversation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileAssets FileAsset[]
+
+  @@index([customerId])
+  @@index([dressmakerId])
+  @@index([status])
+}
+
+model ProjectDetails {
+  id        String @id @default(cuid())
+  projectId String @unique
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  eventDate       DateTime?
+  shipByDate      DateTime?
+  fabricNotes     String?
+  referenceImages String[] // Postgres array URLs
+
+  // optional: structured fields you’ll likely want later
+  colorPreferences String?
+  sizeNotes        String?
+  budgetCeiling    Int? // again consider cents
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Measurement {
+  id         String @id @default(cuid())
+  customerId String
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // flexible schema for measurements (bust/waist/hips/etc) without constant migrations
+  fieldsJson Json
+
+  // “latest measurement set” can be determined by updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+//// MESSAGING ////
+
+model Conversation {
+  id           String  @id @default(cuid())
+  customerId   String
+  dressmakerId String
+  projectId    String?
+
+  customer   User     @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Restrict)
+  dressmaker User     @relation("DressmakerConversations", fields: [dressmakerId], references: [id], onDelete: Restrict)
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Prevent accidental duplicate conversations for same pair + same project
+  @@unique([customerId, dressmakerId, projectId])
+  @@index([customerId])
+  @@index([dressmakerId])
+  @@index([projectId])
+}
+
+model Message {
+  id             String @id @default(cuid())
+  conversationId String
+  senderId       String
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  text  String?
+  files FileAsset[]
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+//// PAYMENTS ////
+
+model Payment {
+  id                    String        @id @default(cuid())
+  projectId             String        @unique
+  totalAmount           Int // recommended: store in cents
+  currency              String        @default("USD")
+  status                PaymentStatus @default(PROCESSING)
+  stripePaymentIntentId String?       @unique
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Milestone {
+  id        String @id @default(cuid())
+  projectId String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title  String
+  amount Int // cents
+  status MilestoneStatus @default(PENDING)
+  dueAt  DateTime?
+
+  // Transfer (1:1 optional)
+  transfer Transfer?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model Transfer {
+  id               String         @id @default(cuid())
+  milestoneId      String         @unique
+  stripeTransferId String?        @unique
+  status           TransferStatus @default(PENDING)
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//// REVIEWS ////
+
+model Review {
+  id        String @id @default(cuid())
+  projectId String @unique
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  rating    Int // 1..5 (validate in app)
+  text      String?
+  photoUrls String[] // Postgres array URLs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fileAssets FileAsset[]
+}
+
+enum FilePurpose {
+  MESSAGE_ATTACHMENT
+  PROJECT_REFERENCE
+  PORTFOLIO_IMAGE
+  REVIEW_PHOTO
+}
+
+model FileAsset {
+  id       String  @id @default(cuid())
+  url      String // where the file actually lives (S3, Cloudinary, etc.)
+  mimeType String?
+  fileName String?
+  byteSize Int?
+
+  purpose FilePurpose
+
+  // Who uploaded the file
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Optional links (a file can belong to ONE of these)
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  portfolioItemId String?
+  portfolioItem   PortfolioItem? @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  reviewId String?
+  review   Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([projectId])
+  @@index([messageId])
+}
