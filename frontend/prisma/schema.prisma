@@ -64,6 +64,8 @@ enum AttireType {
   OUTERWEAR
   TRADITIONAL
   OTHER
+  BRIDAL
+  EVENINGWEAR
 }
 
 //// CORE MODELS ////
