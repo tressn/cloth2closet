@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json()
-  const { title, attireType, tags, description, isFeatured } = body
+  const { title, attireType, tags, description, isFeatured, imageUrls } = body
 
   if (typeof title !== "string" || title.trim().length === 0) {
     return NextResponse.json({ error: "Title is required" }, { status: 400 })
@@ -45,6 +45,10 @@ export async function POST(req: Request) {
     ? tags.map((t) => String(t).trim()).filter(Boolean)
     : []
 
+  const safeImageUrls = Array.isArray(imageUrls)
+  ? imageUrls.map((u) => String(u).trim()).filter(Boolean)
+  : []
+  
   const safeDescription =
     typeof description === "string" && description.trim().length > 0
       ? description.trim()
@@ -58,7 +62,7 @@ export async function POST(req: Request) {
       title: title.trim(),
       attireType: safeAttireType,
       tags: safeTags,
-      imageUrls: [], // ✅ still empty until we do S3
+      imageUrls: safeImageUrls,
       description: safeDescription,
       isFeatured: safeIsFeatured,
     },

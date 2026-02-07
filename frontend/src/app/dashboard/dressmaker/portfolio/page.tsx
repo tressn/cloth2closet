@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import NewPortfolioItemForm from "./NewPortfolioItemForm"
+import DeleteButton from "./DeleteButton"
+
 
 export default async function DressmakerPortfolioPage() {
   const session = await getServerSession(authOptions)
@@ -90,6 +92,9 @@ export default async function DressmakerPortfolioPage() {
                   padding: 14,
                 }}
               >
+                 <DeleteButton id={item.id} />
+                 <a href={`/dashboard/dressmaker/portfolio/${item.id}/edit`}>Edit</a>
+
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 16 }}>{item.title}</div>

@@ -30,6 +30,8 @@ export default async function DressmakerPublicPage({
         <h1 style={{ marginBottom: 8 }}>
           {dressmaker.displayName ?? "Dressmaker"}
         </h1>
+        
+        <a href={`/dressmakers/${dressmaker.id}/request`}>Request a quote</a>
 
         <div style={{ display: "grid", gap: 6 }}>
           {dressmaker.location && <div>📍 {dressmaker.location}</div>}
@@ -114,22 +116,22 @@ export default async function DressmakerPublicPage({
                     {item.tags.join(" • ")}
                   </div>
                 )}
-
+                {item.imageUrls?.[0] ? (
+                  <img
+                    src={item.imageUrls[0]}
+                    alt={item.title}
+                    style={{ 
+                      width: "100%", 
+                      height: 140, 
+                      objectFit: "cover", 
+                      borderRadius: 8, 
+                      marginTop: 10 
+                    }}
+                  />
+                ) : ( 
+                <div style={{ /* placeholder styles */ }}>Images coming soon</div>
+)}
                 {/* For now: show placeholder. Later we’ll show images. */}
-                <div
-                  style={{
-                    marginTop: 10,
-                    height: 140,
-                    borderRadius: 8,
-                    background: "#f3f3f3",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 12,
-                  }}
-                >
-                  Images coming soon
-                </div>
               </article>
             ))}
           </div>

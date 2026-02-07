@@ -22,52 +22,100 @@ export default function NewPortfolioItemForm() {
   const [description, setDescription] = useState("")
   const [isFeatured, setIsFeatured] = useState(false)
 
+  const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
-  async function onCreate() {
-    setSaving(true)
-    setMessage(null)
-
-    const tags = tagsText
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-
-    const res = await fetch("/api/portfolio-items", {
+  async function uploadOne(file: File): Promise<string> {
+    // 1) Ask server for a presigned URL
+    const presignRes = await fetch("/api/uploads/presign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        title,
-        attireType,
-        tags,
-        description,
-        isFeatured,
+        filename: file.name,
+        contentType: file.type,
       }),
     })
 
-    const data = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      setMessage(data?.error ?? `Create failed (${res.status})`)
-      setSaving(false)
-      return
+    const presignData = await presignRes.json().catch(() => ({}))
+    if (!presignRes.ok) {
+      throw new Error(presignData?.error ?? `Presign failed (${presignRes.status})`)
     }
 
-    setMessage("Created! Refreshing…")
-    setSaving(false)
-    window.location.reload()
+    const { uploadUrl, publicUrl } = presignData as { uploadUrl: string; publicUrl: string }
+
+    // 2) Upload file directly to S3 with PUT
+    const putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type,
+      },
+      body: file,
+    })
+
+    if (!putRes.ok) {
+      throw new Error(`S3 upload failed (${putRes.status})`)
+    }
+
+    return publicUrl
+  }
+
+  async function onCreate() {
+    try {
+      setSaving(true)
+      setMessage(null)
+
+      const tags = tagsText
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+
+      // Upload images first
+      setMessage(files.length ? "Uploading images..." : "Creating item...")
+
+      const imageUrls: string[] = []
+      for (const file of files) {
+        const url = await uploadOne(file)
+        imageUrls.push(url)
+      }
+
+      setMessage("Saving portfolio item...")
+
+      // Create PortfolioItem with imageUrls
+      const res = await fetch("/api/portfolio-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          attireType,
+          tags,
+          description,
+          isFeatured,
+          imageUrls,
+        }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error ?? `Create failed (${res.status})`)
+      }
+
+      setMessage("Created! Refreshing…")
+      window.location.reload()
+    } catch (e: any) {
+      setMessage(e?.message ?? "Something went wrong")
+      setSaving(false)
+    }
   }
 
   return (
-    <div style={{ display: "grid", gap: 10, maxWidth: 600 }}>
+    <div style={{ display: "grid", gap: 10, maxWidth: 650 }}>
       <label>
         <div>Title</div>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           style={{ width: "100%", padding: 8 }}
-          placeholder="e.g. Hand-stitched bridal gown"
         />
       </label>
 
@@ -101,8 +149,7 @@ export default function NewPortfolioItemForm() {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          style={{ width: "100%", padding: 8, minHeight: 100 }}
-          placeholder="Details about materials, techniques, turnaround time..."
+          style={{ width: "100%", padding: 8, minHeight: 90 }}
         />
       </label>
 
@@ -115,8 +162,19 @@ export default function NewPortfolioItemForm() {
         <span>Featured item</span>
       </label>
 
+      <label>
+        <div>Images</div>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        />
+        <small>{files.length} file(s) selected</small>
+      </label>
+
       <button type="button" onClick={onCreate} disabled={saving} style={{ padding: 10 }}>
-        {saving ? "Creating..." : "Create item"}
+        {saving ? "Working..." : "Create item"}
       </button>
 
       {message && <p>{message}</p>}

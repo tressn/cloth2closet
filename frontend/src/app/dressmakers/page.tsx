@@ -14,7 +14,7 @@ export default async function DressmakersListPage({
   const minPrice = minPriceRaw ? Number(minPriceRaw) : undefined
 
   const where: any = {
-    // later you can add: isPublished: true
+    isPublished: true, isPaused: false
   }
 
   // "q" search across a few text fields
