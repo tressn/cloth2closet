@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
+import MessageButton from "./MessageButton"
 
 
 export default async function DressmakerPublicPage({
@@ -31,7 +32,21 @@ export default async function DressmakerPublicPage({
           {dressmaker.displayName ?? "Dressmaker"}
         </h1>
         
-        <a href={`/dressmakers/${dressmaker.id}/request`}>Request a quote</a>
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <a
+            href={`/dressmakers/${dressmaker.id}/request`}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #ddd",
+              textDecoration: "none",
+              display: "inline-block",
+            }}
+          >
+            Request a quote
+          </a>
+           <MessageButton dressmakerUserId={dressmaker.userId} />
+        </div>
 
         <div style={{ display: "grid", gap: 6 }}>
           {dressmaker.location && <div>📍 {dressmaker.location}</div>}

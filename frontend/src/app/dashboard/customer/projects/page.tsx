@@ -25,6 +25,10 @@ export default async function CustomerProjectsPage() {
             <div>Status: {p.status}</div>
             <div>Quote: {p.quotedTotalAmount ?? "Not yet"} {p.currency}</div>
             <div>Payment: {p.payment?.status ?? "None"}</div>
+            <a href={`/dashboard/customer/projects/${p.id}`} style={{ textDecoration: "underline" }}>
+              View project
+            </a>
+
 
             {p.payment && p.payment.status === PaymentStatus.REQUIRES_PAYMENT_METHOD && (
               <form action={`/api/payments/checkout?projectId=${p.id}`} method="POST">

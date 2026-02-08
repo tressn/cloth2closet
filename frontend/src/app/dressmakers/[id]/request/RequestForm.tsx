@@ -25,7 +25,7 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
     setLoading(false)
 
     if (!res.ok) {
-      setMsg(data?.error ?? "Failed to create request")
+      setMsg(data?.error ?? "Failed")
       return
     }
 
@@ -45,7 +45,6 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           style={{ minHeight: 120 }}
-          placeholder="What do you want made? Any deadlines, fabric notes, references..."
         />
       </label>
 

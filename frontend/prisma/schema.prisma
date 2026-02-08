@@ -23,6 +23,7 @@ enum ProjectStatus {
   REQUESTED
   ACCEPTED
   IN_PROGRESS
+  FIT_SAMPLE_SENT
   READY_TO_SHIP
   SHIPPED
   COMPLETED
@@ -221,6 +222,13 @@ model ProjectDetails {
   shipByDate      DateTime?
   fabricNotes     String?
   referenceImages String[] // Postgres array URLs
+  fabricAgreed    Boolean @default(false)
+  fabricAgreedNote String?
+
+  requireSketch   Boolean @default(false)
+  sketchImage     String[]
+
+  
 
   // optional: structured fields you’ll likely want later
   colorPreferences String?

@@ -2,36 +2,82 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
+import { FilePurpose } from "@prisma/client"
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  }
 
-  const { id } = await params
-  const body = await req.json()
-  const text = typeof body?.text === "string" ? body.text.trim() : ""
-
-  if (!text) return NextResponse.json({ error: "Text required" }, { status: 400 })
-
-  const convo = await prisma.conversation.findUnique({ where: { id } })
-  if (!convo) return NextResponse.json({ error: "Not found" }, { status: 404 })
-
+  const { id: conversationId } = await params
   const userId = session.user.id
-  if (convo.customerId !== userId && convo.dressmakerId !== userId) {
+
+  // 1) Make sure conversation exists
+  const convo = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { id: true, customerId: true, dressmakerId: true, projectId: true },
+  })
+
+  if (!convo) {
+    return NextResponse.json({ error: "Conversation not found" }, { status: 404 })
+  }
+
+  // 2) Authorization: user must be in this conversation
+  const isMember =
+    convo.customerId === userId || convo.dressmakerId === userId || session.user.role === "ADMIN"
+  if (!isMember) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const msg = await prisma.message.create({
+  // 3) Parse body
+  const body = await req.json()
+  const text = typeof body?.text === "string" ? body.text.trim() : ""
+  const attachmentsRaw = body?.attachments
+
+  const attachments: string[] = Array.isArray(attachmentsRaw)
+    ? attachmentsRaw.map((u: any) => String(u).trim()).filter(Boolean)
+    : []
+
+  if (!text && attachments.length === 0) {
+    return NextResponse.json(
+      { error: "Message must include text or at least 1 attachment" },
+      { status: 400 }
+    )
+  }
+
+  // Optional safety: limit to prevent abuse
+  if (attachments.length > 10) {
+    return NextResponse.json({ error: "Too many attachments (max 10)" }, { status: 400 })
+  }
+
+  // 4) Create Message row
+  const message = await prisma.message.create({
     data: {
-      conversationId: id,
+      conversationId,
       senderId: userId,
-      text,
-      attachments: [],
+      text: text || null,
+      attachments, // this is the Message.attachments String[] you already have
     },
   })
 
-  // bump conversation updatedAt by touching it (optional)
-  await prisma.conversation.update({ where: { id }, data: { updatedAt: new Date() } })
+  // 5) Create FileAsset rows (traceability)
+  // One row per attachment URL
+  if (attachments.length > 0) {
+    await prisma.fileAsset.createMany({
+      data: attachments.map((url) => ({
+        url,
+        purpose: FilePurpose.MESSAGE_ATTACHMENT,
+        ownerId: userId,
+        messageId: message.id,
+        // If this conversation is project-linked, keep traceability to the project too:
+        projectId: convo.projectId ?? null,
+      })),
+    })
+  }
 
-  return NextResponse.json({ ok: true, messageId: msg.id })
+  return NextResponse.json({ ok: true, message })
 }

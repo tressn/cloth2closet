@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
 import { redirect, notFound } from "next/navigation"
 import RequestForm from "./RequestForm"
+import MessageButton from "../MessageButton"
 
 export default async function RequestProjectPage({
   params,
@@ -31,7 +32,7 @@ export default async function RequestProjectPage({
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 720, margin: "0 auto" }}>
+     <main style={{ padding: 24, maxWidth: 720, margin: "0 auto" }}>
       <h1>Request a quote</h1>
       <p>Send a request to {dressmaker.displayName ?? "this dressmaker"}.</p>
 

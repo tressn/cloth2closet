@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
 import ProfileForm from "./ProfileForm"
+import PublishToggle from "./PublishToggle"
+
 
 export default async function DressmakerProfilePage() {
   const session = await getServerSession(authOptions)
@@ -45,6 +47,8 @@ export default async function DressmakerProfilePage() {
       <p>Edit your profile details. These will be shown on your public page.</p>
 
       <ProfileForm initialProfile={profile} />
+      <PublishToggle initialPublished={profile.isPublished} />
+
     </main>
   )
 }
