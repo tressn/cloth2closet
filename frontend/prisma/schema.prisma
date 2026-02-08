@@ -403,6 +403,8 @@ model FileAsset {
   reviewId String?
   review   Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 
+  
+
   createdAt DateTime @default(now())
 
   @@index([ownerId])
