@@ -1,26 +1,56 @@
 @import "tailwindcss";
 
+/* ----------------------------
+   Design Tokens (Luxury Plum)
+   ---------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Neutrals (warm) */
+  --bg: #FBF7F4;
+  --surface: #FFFFFF;
+  --surface-2: #F6EFEB;
+  --border: #E8DDD6;
+
+  --text: #1B1418;
+  --muted: #5E505A;
+  --muted-2: #7A6B75;
+
+  /* Brand: Deep Plum */
+  --plum-900: #2A0E22;
+  --plum-800: #3A1430;
+  --plum-700: #4F1D41;
+  --plum-600: #6A2A59;
+  --plum-500: #86386F; /* primary */
+  --plum-200: #E9D6E2;
+
+  /* Complimentary accents */
+  --gold: #C7A24A; /* rare highlight */
+  --sage: #2E6B57; /* trust/success */
+  --danger: #B4232C;
+
+  /* Shape / depth */
+  --radius: 16px;
+  --shadow: 0 10px 28px rgba(27, 20, 24, 0.10);
+
+  /* Typography scale */
+  --text-xs: 12px;  --lh-xs: 16px;
+  --text-sm: 14px;  --lh-sm: 20px;
+  --text-md: 16px;  --lh-md: 24px;
+  --text-lg: 18px;  --lh-lg: 28px;
+  --text-xl: 20px;  --lh-xl: 28px;
+  --text-2xl: 24px; --lh-2xl: 32px;
+  --text-3xl: 30px; --lh-3xl: 36px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  html, body { height: 100%; }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  a { color: inherit; text-decoration: none; }
+
+  :focus-visible { outline: none; }
 }

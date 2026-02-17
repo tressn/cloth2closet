@@ -1,45 +1,78 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/authOptions"
-import { prisma } from "@/lib/prisma"
-import { redirect } from "next/navigation"
-import { PaymentStatus } from "@prisma/client"
+import Link from "next/link";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { PaymentStatus } from "@prisma/client";
+import { DashboardShell } from "@/app/dashboard/DashboardShell";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 export default async function CustomerProjectsPage() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect("/api/auth/signin")
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) redirect("/api/auth/signin");
 
   const projects = await prisma.project.findMany({
     where: { customerId: session.user.id },
     orderBy: { updatedAt: "desc" },
     include: { payment: true },
-  })
+  });
 
   return (
-    <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
-      <h1>My Projects</h1>
+    <DashboardShell
+      title="My projects"
+      subtitle="View quotes, pay securely, and track progress."
+      tabs={[
+        { label: "Projects", href: "/dashboard/customer/projects" },
+        { label: "Measurements", href: "/dashboard/customer/measurements" },
+      ]}
+    >
+      <div className="max-w-4xl">
+        <Card>
+          <CardHeader title="Projects" subtitle={`${projects.length} project${projects.length === 1 ? "" : "s"}`} />
+          <CardBody>
+            {projects.length === 0 ? (
+              <div className="text-[14px] text-[var(--muted)]">No projects yet.</div>
+            ) : (
+              <div className="grid gap-3">
+                {projects.map((p) => (
+                  <div key={p.id} className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-[15px] font-semibold text-[var(--text)]">{p.projectCode}</div>
+                        <div className="mt-1 text-[13px] text-[var(--muted)]">Status: {p.status}</div>
+                      </div>
 
-      <div style={{ display: "grid", gap: 10 }}>
-        {projects.map((p) => (
-          <div key={p.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
-            <div style={{ fontWeight: 700 }}>{p.projectCode}</div>
-            <div>Status: {p.status}</div>
-            <div>Quote: {p.quotedTotalAmount ?? "Not yet"} {p.currency}</div>
-            <div>Payment: {p.payment?.status ?? "None"}</div>
-            <a href={`/dashboard/customer/projects/${p.id}`} style={{ textDecoration: "underline" }}>
-              View project
-            </a>
+                      <Badge tone="neutral">
+                        Quote: {p.quotedTotalAmount ?? "—"} {p.currency}
+                      </Badge>
+                    </div>
 
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <Link className="text-[13px] font-medium underline text-[var(--plum-600)]" href={`/dashboard/customer/projects/${p.id}`}>
+                        View project
+                      </Link>
 
-            {p.payment && p.payment.status === PaymentStatus.REQUIRES_PAYMENT_METHOD && (
-              <form action={`/api/payments/checkout?projectId=${p.id}`} method="POST">
-                <button type="submit" style={{ padding: 10, marginTop: 10 }}>
-                  Pay now
-                </button>
-              </form>
+                      <div className="flex items-center gap-2">
+                        <Badge tone="neutral">Payment: {p.payment?.status ?? "None"}</Badge>
+
+                        {p.payment && p.payment.status === PaymentStatus.REQUIRES_PAYMENT_METHOD ? (
+                          <form action={`/api/payments/checkout?projectId=${p.id}`} method="POST">
+                            <Button type="submit" variant="primary" size="sm">
+                              Pay now
+                            </Button>
+                          </form>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
-        ))}
+          </CardBody>
+        </Card>
       </div>
-    </main>
-  )
+    </DashboardShell>
+  );
 }

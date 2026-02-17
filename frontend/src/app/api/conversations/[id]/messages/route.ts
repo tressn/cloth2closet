@@ -16,7 +16,6 @@ export async function POST(
   const { id: conversationId } = await params
   const userId = session.user.id
 
-  // 1) Make sure conversation exists
   const convo = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: { id: true, customerId: true, dressmakerId: true, projectId: true },
@@ -26,21 +25,30 @@ export async function POST(
     return NextResponse.json({ error: "Conversation not found" }, { status: 404 })
   }
 
-  // 2) Authorization: user must be in this conversation
   const isMember =
     convo.customerId === userId || convo.dressmakerId === userId || session.user.role === "ADMIN"
   if (!isMember) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  // 3) Parse body
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}))
   const text = typeof body?.text === "string" ? body.text.trim() : ""
   const attachmentsRaw = body?.attachments
 
-  const attachments: string[] = Array.isArray(attachmentsRaw)
+  const attachmentsParsed: string[] = Array.isArray(attachmentsRaw)
     ? attachmentsRaw.map((u: any) => String(u).trim()).filter(Boolean)
     : []
+
+  // optional: dedupe
+  const attachments = Array.from(new Set(attachmentsParsed))
+
+  // ✅ validate attachment URLs BEFORE saving
+  const publicBase = process.env.S3_PUBLIC_BASE_URL!
+  for (const url of attachments) {
+    if (!url.startsWith(publicBase)) {
+      return NextResponse.json({ error: "Invalid attachment URL" }, { status: 400 })
+    }
+  }
 
   if (!text && attachments.length === 0) {
     return NextResponse.json(
@@ -49,23 +57,19 @@ export async function POST(
     )
   }
 
-  // Optional safety: limit to prevent abuse
   if (attachments.length > 10) {
     return NextResponse.json({ error: "Too many attachments (max 10)" }, { status: 400 })
   }
 
-  // 4) Create Message row
   const message = await prisma.message.create({
     data: {
       conversationId,
       senderId: userId,
       text: text || null,
-      attachments, // this is the Message.attachments String[] you already have
+      attachments,
     },
   })
 
-  // 5) Create FileAsset rows (traceability)
-  // One row per attachment URL
   if (attachments.length > 0) {
     await prisma.fileAsset.createMany({
       data: attachments.map((url) => ({
@@ -73,7 +77,6 @@ export async function POST(
         purpose: FilePurpose.MESSAGE_ATTACHMENT,
         ownerId: userId,
         messageId: message.id,
-        // If this conversation is project-linked, keep traceability to the project too:
         projectId: convo.projectId ?? null,
       })),
     })

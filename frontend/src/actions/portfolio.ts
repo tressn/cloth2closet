@@ -1,7 +1,7 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { requireDressmaker } from "@/lib/requireRole"
+import { requireDressmaker } from "@/lib/requiredRole"
 
 export async function createPortfolioItemAction(data: {
   title: string

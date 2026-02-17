@@ -1,50 +1,199 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/authOptions"
-import { prisma } from "@/lib/prisma"
-import { redirect, notFound } from "next/navigation"
-import MessageComposer from "./MessageComposer"
+import Link from "next/link";
+import { requireUser } from "@/lib/requiredRole";
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import MessageComposer from "./MessageComposer";
+import MessagesShell from "../MessagesShell";
+
+function AttachmentGallery({ urls, mine }: { urls: string[]; mine: boolean }) {
+  const safe = Array.isArray(urls) ? urls.filter(Boolean).slice(0, 10) : [];
+  if (safe.length === 0) return null;
+
+  return (
+    <div className="mt-3">
+      <div className={["grid gap-2", safe.length === 1 ? "grid-cols-1" : "grid-cols-2"].join(" ")}>
+        {safe.map((url, idx) => (
+          <a
+            key={`${url}-${idx}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={[
+              "block overflow-hidden rounded-xl border",
+              mine ? "border-white/20" : "border-[var(--border)]",
+            ].join(" ")}
+            title="Open image"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={url}
+              alt="Attachment"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="h-40 w-full object-cover"
+            />
+          </a>
+        ))}
+      </div>
+      <div className={["mt-2 text-[12px]", mine ? "text-white/80" : "text-[var(--muted)]"].join(" ")}>
+        {safe.length} photo{safe.length === 1 ? "" : "s"}
+      </div>
+    </div>
+  );
+}
+
+function previewText(text?: string | null) {
+  const t = (text ?? "").trim();
+  return t ? t.slice(0, 90) : "";
+}
 
 export default async function ConversationPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) redirect("/api/auth/signin")
+  const { id } = await params;
+  const user = await requireUser();
+  const userId = user.id;
 
-  const { id } = await params
-  const userId = session.user.id
-
+  // Fetch convo for right panel
   const convo = await prisma.conversation.findUnique({
     where: { id },
+    include: { project: true, messages: { orderBy: { createdAt: "asc" } } },
+  });
+
+  if (!convo) notFound();
+  if (convo.customerId !== userId && convo.dressmakerId !== userId) notFound();
+
+  // Mark as read (clears NEW badge)
+  await prisma.conversationRead.upsert({
+    where: { conversationId_userId: { conversationId: convo.id, userId } },
+    update: { lastReadAt: new Date() },
+    create: { conversationId: convo.id, userId, lastReadAt: new Date() },
+  });
+
+  // Fetch list for left panel
+  const convos = await prisma.conversation.findMany({
+    where: { OR: [{ customerId: userId }, { dressmakerId: userId }] },
+    orderBy: { updatedAt: "desc" },
     include: {
       project: true,
-      messages: { orderBy: { createdAt: "asc" } },
+      customer: { select: { id: true, name: true, email: true } },
+      dressmaker: { select: { id: true, name: true, email: true } },
+      messages: { take: 1, orderBy: { createdAt: "desc" } },
+      conversationReads: { where: { userId }, take: 1, select: { lastReadAt: true } },
     },
-  })
-  if (!convo) notFound()
+  });
 
-  if (convo.customerId !== userId && convo.dressmakerId !== userId) notFound()
+  const list = (
+    <Card>
+      <CardHeader title="Inbox" subtitle={`${convos.length} conversation${convos.length === 1 ? "" : "s"}`} />
+      <CardBody>
+        <div className="grid gap-3">
+          {convos.map((c) => {
+            const last = c.messages[0];
+            const lastText = previewText(last?.text);
+            const photoCount = Array.isArray(last?.attachments) ? last!.attachments.length : 0;
 
-  return (
-    <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
-      <h1>{convo.project?.projectCode ?? "Conversation"}</h1>
+            const read = c.conversationReads[0]?.lastReadAt ?? null;
+            const lastAt = last?.createdAt ?? c.updatedAt;
+            const isNew = read ? lastAt > read : true;
 
-      <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, marginTop: 12 }}>
-        {convo.messages.map((m) => (
-          <div key={m.id} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>
-              {m.senderId === userId ? "You" : "Them"} •{" "}
-              {new Date(m.createdAt).toLocaleString()}
-            </div>
-            <div style={{ whiteSpace: "pre-wrap" }}>{m.text ?? ""}</div>
-          </div>
-        ))}
-      </div>
+            const other = c.customerId === userId ? c.dressmaker : c.customer;
+            const otherName = other?.name || other?.email || "Conversation";
 
-      <div style={{ marginTop: 12 }}>
-        <MessageComposer conversationId={convo.id} />
-      </div>
-    </main>
-  )
+            const active = c.id === convo.id;
+
+            return (
+              <Link key={c.id} href={`/messages/${c.id}`} className="block">
+                <div
+                  className={[
+                    "rounded-[var(--radius)] border px-5 py-4",
+                    active
+                      ? "border-[rgba(134,56,111,0.35)] bg-[rgba(134,56,111,0.08)]"
+                      : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="truncate text-[15px] font-semibold text-[var(--text)]">
+                        {c.project?.projectCode ?? otherName}
+                      </div>
+                      <div className="mt-2 text-[13px] text-[var(--muted)]">
+                        {lastText
+                          ? lastText
+                          : photoCount > 0
+                            ? `(sent ${photoCount} photo${photoCount === 1 ? "" : "s"})`
+                            : "(no messages)"}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      {photoCount > 0 ? (
+                        <div className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[12px] text-[var(--muted)]">
+                          📷 {photoCount}
+                        </div>
+                      ) : null}
+                      {isNew && !active ? (
+                        <div className="rounded-full bg-[var(--plum-500)] px-3 py-1 text-[12px] font-semibold text-white">
+                          NEW
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </CardBody>
+    </Card>
+  );
+
+  const detail = (
+    <Card>
+      <CardHeader
+        title={convo.project?.projectCode ?? "Conversation"}
+        subtitle="Messages are private between you and the other party."
+      />
+      <CardBody>
+        <div className="space-y-3">
+          {convo.messages.map((m) => {
+            const mine = m.senderId === userId;
+            const attachments = Array.isArray(m.attachments) ? m.attachments : [];
+
+            return (
+              <div key={m.id} className={mine ? "flex justify-end" : "flex justify-start"}>
+                <div
+                  className={[
+                    "max-w-[80%] rounded-2xl px-4 py-3",
+                    mine
+                      ? "bg-[var(--plum-500)] text-white"
+                      : "bg-[var(--surface-2)] text-[var(--text)] border border-[var(--border)]",
+                  ].join(" ")}
+                >
+                  <div className="text-[12px] opacity-80">
+                    {mine ? "You" : "Them"} • {new Date(m.createdAt).toLocaleString()}
+                  </div>
+
+                  {m.text ? (
+                    <div className="mt-1 whitespace-pre-wrap text-[14px] leading-6">{m.text}</div>
+                  ) : null}
+
+                  <AttachmentGallery urls={attachments} mine={mine} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-6 border-t border-[var(--border)] pt-5">
+          <MessageComposer conversationId={convo.id} />
+        </div>
+      </CardBody>
+    </Card>
+  );
+
+  return <MessagesShell list={list} detail={detail} />;
 }

@@ -1,53 +1,59 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
+import { Container } from "@/components/ui/Container";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
 export default function BecomeDressmakerPage() {
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   async function handleBecomeDressmaker() {
-    console.log("CLICK HANDLER RAN")
-    setLoading(true)
-    setMessage(null)
+    setLoading(true);
+    setMessage(null);
 
-    const res = await fetch("/api/account/become-dressmaker", {
-      method: "POST",
-    })
-
-    const data = await res.json()
+    const res = await fetch("/api/account/become-dressmaker", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      setMessage(data?.error ?? "Something went wrong")
-      setLoading(false)
-      return
+      setMessage(data?.error ?? "Something went wrong");
+      setLoading(false);
+      return;
     }
 
-    setMessage("You are now a dressmaker! Go to your dashboard to edit your profile.")
-    setLoading(false)
-
-    // Optional: refresh to ensure session/role updates are reflected
-    window.location.href = "/dashboard/dressmaker/profile"
+    setMessage("You are now a dressmaker! Redirecting to your profile…");
+    setLoading(false);
+    window.location.href = "/dashboard/dressmaker/profile";
   }
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Become a Dressmaker</h1>
-      <p>This will upgrade your account and create your dressmaker profile.</p>
+    <div className="bg-[var(--bg)]">
+      <Container>
+        <main className="py-10">
+          <div className="mx-auto max-w-2xl">
+            <Card>
+              <CardHeader
+                title="Become a Dressmaker"
+                subtitle="Upgrade your account and create your public dressmaker profile."
+              />
+              <CardBody className="space-y-4">
+                <div className="text-[14px] leading-6 text-[var(--muted)]">
+                  You’ll be able to publish a profile, upload portfolio items, and manage customer projects.
+                </div>
 
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          handleBecomeDressmaker()
-          }}
-  disabled={loading}
->
-        {loading ? "Upgrading..." : "Become a Dressmaker"}
-      </button>
+                <Button type="button" onClick={handleBecomeDressmaker} disabled={loading} variant="primary">
+                  {loading ? "Upgrading..." : "Become a Dressmaker"}
+                </Button>
 
-      {message && <p style={{ marginTop: 12 }}>{message}</p>}
-    </main>
-  )
+                {message ? (
+                  <div className="text-[14px] text-[var(--muted)]">{message}</div>
+                ) : null}
+              </CardBody>
+            </Card>
+          </div>
+        </main>
+      </Container>
+    </div>
+  );
 }

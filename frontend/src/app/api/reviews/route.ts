@@ -1,55 +1,67 @@
-import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/authOptions"
-import { prisma } from "@/lib/prisma"
-import { ProjectStatus, PaymentStatus } from "@prisma/client"
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { prisma } from "@/lib/prisma";
+
+function bad(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status });
+}
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  if (!userId) return bad("Not authenticated", 401);
 
-  const body = await req.json()
-  const { projectId, rating, text } = body
+  const body = await req.json().catch(() => null);
+  if (!body) return bad("Invalid JSON body");
 
-  if (typeof projectId !== "string") {
-    return NextResponse.json({ error: "projectId required" }, { status: 400 })
-  }
+  const projectId = String(body.projectId ?? "");
+  const rating = Number(body.rating);
+  const text = (body.text ?? "").toString().trim();
+  const photoUrls: string[] = Array.isArray(body.photoUrls) ? body.photoUrls : [];
 
-  const r = Number(rating)
-  if (!Number.isFinite(r) || r < 1 || r > 5) {
-    return NextResponse.json({ error: "rating must be 1..5" }, { status: 400 })
-  }
+  if (!projectId) return bad("projectId is required");
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return bad("rating must be 1–5");
+  if (text.length > 1500) return bad("text is too long (max 1500 characters)");
+  if (photoUrls.length > 10) return bad("Max 10 photos");
 
+  // Load project with payment + existing review
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { payment: true, review: true },
-  })
+  });
 
-  if (!project || project.customerId !== session.user.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  if (!project) return bad("Project not found", 404);
+
+  // RULES (verified reviews)
+  if (project.customerId !== userId) return bad("Forbidden", 403);
+  if (project.status !== "COMPLETED") return bad("Project must be completed");
+  if (!project.payment || project.payment.status !== "SUCCEEDED") {
+    return bad("Payment must be settled");
   }
+  if (project.review) return bad("Review already exists for this project", 409);
 
-  if (project.review) {
-    return NextResponse.json({ error: "Review already exists for this project" }, { status: 400 })
-  }
-
-  if (project.status !== ProjectStatus.COMPLETED) {
-    return NextResponse.json({ error: "Project must be COMPLETED to review" }, { status: 400 })
-  }
-
-  // recommended rule:
-  if (!project.payment || project.payment.status !== PaymentStatus.SUCCEEDED) {
-    return NextResponse.json({ error: "Payment must be SUCCEEDED to review" }, { status: 400 })
-  }
-
+  // Create verified review
   const review = await prisma.review.create({
     data: {
-      projectId,
-      rating: Math.trunc(r),
-      text: typeof text === "string" && text.trim() ? text.trim() : null,
-      photoUrls: [],
+      projectId: project.id,
+      authorId: userId,
+      rating,
+      text: text || null,
+      photoUrls,
+      isVerified: true, // verified because we enforce rules here
     },
-  })
+  });
 
-  return NextResponse.json({ ok: true, review })
+  await prisma.fileAsset.createMany({
+  data: photoUrls.map((url) => ({
+    url,
+    purpose: "REVIEW_PHOTO",
+    ownerId: userId,
+    reviewId: review.id,
+  })),
+});
+
+
+  return NextResponse.json({ ok: true, reviewId: review.id });
 }

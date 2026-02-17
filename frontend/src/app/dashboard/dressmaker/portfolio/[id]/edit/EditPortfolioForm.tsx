@@ -1,6 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 
 const ATTIRE_TYPES = [
   "DRESS",
@@ -12,79 +16,88 @@ const ATTIRE_TYPES = [
   "TRADITIONAL",
   "OTHER",
   "BRIDAL",
-  "EVENINGWEAR"
-] as const
+  "EVENINGWEAR",
+] as const;
+
+type AttireType = (typeof ATTIRE_TYPES)[number];
 
 export default function EditPortfolioForm({ item }: { item: any }) {
-  const [title, setTitle] = useState(item.title ?? "")
-  const [attireType, setAttireType] = useState(item.attireType ?? "OTHER")
-  const [tagsText, setTagsText] = useState((item.tags ?? []).join(", "))
-  const [description, setDescription] = useState(item.description ?? "")
-  const [isFeatured, setIsFeatured] = useState(!!item.isFeatured)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [title, setTitle] = useState(item.title ?? "");
+  const [attireType, setAttireType] = useState<AttireType>((item.attireType ?? "OTHER") as AttireType);
+  const [tagsText, setTagsText] = useState((item.tags ?? []).join(", "));
+  const [description, setDescription] = useState(item.description ?? "");
+  const [isFeatured, setIsFeatured] = useState(!!item.isFeatured);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   async function onSave() {
-    setSaving(true)
-    setMessage(null)
+    setSaving(true);
+    setMessage(null);
 
-    const tags = tagsText.split(",").map((s) => s.trim()).filter(Boolean)
+    const tags = tagsText.split(",").map((s) => s.trim()).filter(Boolean);
 
     const res = await fetch(`/api/portfolio-items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, attireType, tags, description, isFeatured }),
-    })
+    });
 
-    const data = await res.json().catch(() => ({}))
-    setSaving(false)
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
 
     if (!res.ok) {
-      setMessage(data?.error ?? `Save failed (${res.status})`)
-      return
+      setMessage(data?.error ?? `Save failed (${res.status})`);
+      return;
     }
-
-    setMessage("Saved!")
+    setMessage("Saved!");
   }
 
   return (
-    <div style={{ display: "grid", gap: 10 }}>
-      <label>
-        <div>Title</div>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 8, width: "100%" }} />
-      </label>
+    <div className="grid gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="Title">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="Attire type">
+          <Select value={attireType} onChange={(e) => setAttireType(e.target.value as AttireType)}>
+            {ATTIRE_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </Select>
+        </Field>
+      </div>
 
-      <label>
-        <div>Attire type</div>
-        <select value={attireType} onChange={(e) => setAttireType(e.target.value)} style={{ padding: 8 }}>
-          {ATTIRE_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Field label="Tags" hint="Comma-separated keywords.">
+        <Input value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+      </Field>
 
-      <label>
-        <div>Tags</div>
-        <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} style={{ padding: 8, width: "100%" }} />
-      </label>
+      <Field label="Description">
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+      </Field>
 
-      <label>
-        <div>Description</div>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: 8, minHeight: 100 }} />
-      </label>
-
-      <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
         <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />
-        Featured
+        <div className="text-[14px] text-[var(--text)]">
+          Featured <span className="text-[var(--muted)]">(appears prominently)</span>
+        </div>
       </label>
 
-      <button type="button" onClick={onSave} disabled={saving} style={{ padding: 10 }}>
-        {saving ? "Saving..." : "Save"}
-      </button>
-
-      {message && <p>{message}</p>}
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[13px] text-[var(--muted)]">{message ?? " "}</div>
+        <Button type="button" onClick={onSave} disabled={saving || !title.trim()} variant="primary">
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+      </div>
     </div>
-  )
+  );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="grid gap-2">
+      <div className="text-[12px] font-medium text-[var(--muted)]">{label}</div>
+      {children}
+      {hint ? <div className="text-[12px] leading-5 text-[var(--muted)]">{hint}</div> : null}
+    </label>
+  );
 }

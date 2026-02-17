@@ -1,162 +1,207 @@
-import { prisma } from "@/lib/prisma"
-import { notFound } from "next/navigation"
-import MessageButton from "./MessageButton"
-
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import { Container } from "@/components/ui/Container";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import MessageButton from "./MessageButton";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import SaveDressmakerButton from "./SaveDressmakerButton";
 
 export default async function DressmakerPublicPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }) {
-    const { id } = await params
+  const { id } = await params;
+  if (!id) notFound();
 
-    if (!id) notFound()
-    
   const dressmaker = await prisma.dressmakerProfile.findUnique({
     where: { id },
-    include: {
-      portfolioItems: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  })
+    include: { portfolioItems: { orderBy: { createdAt: "desc" } } },
+  });
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id ?? null;
 
-  if (!dressmaker) {
-    notFound()
-  }
+  const isSaved = userId
+    ? !!(await prisma.savedDressmaker.findUnique({
+        where: {
+          customerId_dressmakerProfileId: {
+            customerId: userId,
+            dressmakerProfileId: dressmaker.id,
+          },
+        },
+        select: { id: true },
+      }))
+    : false;
+
+  if (!dressmaker) notFound();
 
   return (
-    <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ marginBottom: 8 }}>
-          {dressmaker.displayName ?? "Dressmaker"}
-        </h1>
-        
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <a
-            href={`/dressmakers/${dressmaker.id}/request`}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid #ddd",
-              textDecoration: "none",
-              display: "inline-block",
-            }}
-          >
-            Request a quote
-          </a>
-           <MessageButton dressmakerUserId={dressmaker.userId} />
-        </div>
+    <div className="bg-[var(--bg)]">
+      <Container>
+        <main className="py-10">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Left: profile */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader
+                  title={dressmaker.displayName ?? "Dressmaker"}
+                  subtitle={dressmaker.location ? `📍 ${dressmaker.location}` : "📍 Location not listed"}
+                  right={
+                    <div className="flex items-center gap-2">
+                      {dressmaker.yearsExperience != null ? (
+                        <Badge tone="neutral">{dressmaker.yearsExperience} yrs</Badge>
+                      ) : null}
+                      {dressmaker.isPublished ? <Badge tone="success">Published</Badge> : null}
+                    </div>
+                  }
+                />
+                <CardBody>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge tone="neutral">
+                      💰{" "}
+                      {dressmaker.basePriceFrom != null
+                        ? `${formatCents(dressmaker.basePriceFrom)} ${dressmaker.currency}`
+                        : "Pricing not listed"}
+                    </Badge>
 
-        <div style={{ display: "grid", gap: 6 }}>
-          {dressmaker.location && <div>📍 {dressmaker.location}</div>}
+                    {dressmaker.languages?.length ? (
+                      <Badge tone="neutral">🗣️ {dressmaker.languages.slice(0, 3).join(", ")}{dressmaker.languages.length > 3 ? "…" : ""}</Badge>
+                    ) : null}
 
-          {dressmaker.yearsExperience != null && (
-            <div>🧵 {dressmaker.yearsExperience} years experience</div>
-          )}
-
-          <div>
-            💰{" "}
-            {dressmaker.basePriceFrom != null
-              ? `${formatCents(dressmaker.basePriceFrom)} ${dressmaker.currency}`
-              : "Pricing not listed"}
-          </div>
-
-          {dressmaker.languages?.length > 0 && (
-            <div>🗣️ Languages: {dressmaker.languages.join(", ")}</div>
-          )}
-
-          {dressmaker.specialties?.length > 0 && (
-            <div>✨ Specialties: {dressmaker.specialties.join(", ")}</div>
-          )}
-
-          {dressmaker.websiteUrl && (
-            <div>
-              🔗{" "}
-              <a href={dressmaker.websiteUrl} target="_blank" rel="noreferrer">
-                Website
-              </a>
-            </div>
-          )}
-
-          {dressmaker.instagramHandle && (
-            <div>
-              📸{" "}
-              <a
-                href={`https://instagram.com/${dressmaker.instagramHandle}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                @{dressmaker.instagramHandle}
-              </a>
-            </div>
-          )}
-        </div>
-
-        {dressmaker.bio && (
-          <section style={{ marginTop: 16 }}>
-            <h2>About</h2>
-            <p style={{ whiteSpace: "pre-wrap" }}>{dressmaker.bio}</p>
-          </section>
-        )}
-      </header>
-
-      <section>
-        <h2>Portfolio</h2>
-
-        {dressmaker.portfolioItems.length === 0 ? (
-          <p>No portfolio items yet.</p>
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 12,
-              marginTop: 12,
-            }}
-          >
-            {dressmaker.portfolioItems.map((item) => (
-              <article
-                key={item.id}
-                style={{
-                  border: "1px solid #ddd",
-                  borderRadius: 10,
-                  padding: 12,
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>{item.title}</div>
-
-                {item.tags?.length > 0 && (
-                  <div style={{ fontSize: 12, marginTop: 6 }}>
-                    {item.tags.join(" • ")}
+                    {dressmaker.specialties?.length ? (
+                      <Badge tone="neutral">✨ {dressmaker.specialties.slice(0, 2).join(" • ")}{dressmaker.specialties.length > 2 ? "…" : ""}</Badge>
+                    ) : null}
                   </div>
-                )}
-                {item.imageUrls?.[0] ? (
-                  <img
-                    src={item.imageUrls[0]}
-                    alt={item.title}
-                    style={{ 
-                      width: "100%", 
-                      height: 140, 
-                      objectFit: "cover", 
-                      borderRadius: 8, 
-                      marginTop: 10 
-                    }}
-                  />
-                ) : ( 
-                <div style={{ /* placeholder styles */ }}>Images coming soon</div>
-)}
-                {/* For now: show placeholder. Later we’ll show images. */}
-              </article>
-            ))}
+
+                  {dressmaker.bio ? (
+                    <div className="mt-6">
+                      <div className="text-[14px] font-semibold text-[var(--text)]">About</div>
+                      <p className="mt-2 whitespace-pre-wrap text-[15px] leading-7 text-[var(--muted)]">
+                        {dressmaker.bio}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link href={`/dressmakers/${dressmaker.id}/request`} className="inline-flex">
+                      <Button variant="primary">Request a quote</Button>
+                    </Link>
+
+                    <MessageButton dressmakerUserId={dressmaker.userId} />
+
+                    <SaveDressmakerButton
+                      dressmakerProfileId={dressmaker.id}
+                      initialSaved={isSaved}
+                      isAuthed={!!userId}
+                    />
+
+                    {dressmaker.websiteUrl ? (
+                      <a href={dressmaker.websiteUrl} target="_blank" rel="noreferrer" className="inline-flex">
+                        <Button variant="ghost">Website</Button>
+                      </a>
+                    ) : null}
+
+                    {dressmaker.instagramHandle ? (
+                      <a
+                        href={`https://instagram.com/${dressmaker.instagramHandle}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex"
+                      >
+                        <Button variant="ghost">@{dressmaker.instagramHandle}</Button>
+                      </a>
+                    ) : null}
+                  </div>
+                </CardBody>
+              </Card>
+
+              {/* Portfolio */}
+              <Card>
+                <CardHeader title="Portfolio" subtitle="Recent work and sample pieces." />
+                <CardBody>
+                  {dressmaker.portfolioItems.length === 0 ? (
+                    <div className="text-[14px] text-[var(--muted)]">No portfolio items yet.</div>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {dressmaker.portfolioItems.map((item) => (
+                        <article
+                          key={item.id}
+                          className="overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]"
+                        >
+                          <div className="aspect-[4/3] bg-[var(--surface-2)]">
+                            {item.imageUrls?.[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={item.imageUrls[0]}
+                                alt={item.title}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-[13px] text-[var(--muted)]">
+                                Images coming soon
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-4">
+                            <div className="text-[14px] font-semibold text-[var(--text)]">{item.title}</div>
+                            {item.tags?.length ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {item.tags.slice(0, 3).map((t) => (
+                                  <span
+                                    key={t}
+                                    className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--muted)]"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            </div>
+
+            {/* Right: sidebar */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader title="Next steps" subtitle="Quick actions." />
+                <CardBody className="space-y-3">
+                  <Link href="/dressmakers" className="block">
+                    <Button variant="secondary" className="w-full">Browse more makers</Button>
+                  </Link>
+                  <Link href="/messages" className="block">
+                    <Button variant="secondary" className="w-full">Go to messages</Button>
+                  </Link>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title="Trust" subtitle="Signals that help buyers feel confident." />
+                <CardBody>
+                  <ul className="space-y-2 text-[14px] leading-6 text-[var(--muted)]">
+                    <li>• Clear pricing expectations</li>
+                    <li>• Languages & specialties</li>
+                    <li>• Portfolio previews</li>
+                    <li>• Direct messaging</li>
+                  </ul>
+                </CardBody>
+              </Card>
+            </div>
           </div>
-        )}
-      </section>
-    </main>
-  )
+        </main>
+      </Container>
+    </div>
+  );
 }
 
 function formatCents(cents: number) {
-  const dollars = (cents / 100).toFixed(2)
-  return `$${dollars}`
+  return `$${(cents / 100).toFixed(2)}`;
 }

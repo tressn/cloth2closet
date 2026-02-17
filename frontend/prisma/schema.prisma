@@ -69,6 +69,18 @@ enum AttireType {
   EVENINGWEAR
 }
 
+enum DressmakerApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AccountStatus {
+  PENDING_EMAIL_VERIFICATION
+  ACTIVE
+  SUSPENDED
+}
+
 //// CORE MODELS ////
 
 model User {
@@ -78,14 +90,17 @@ model User {
   name          String?
   image         String?
 
-  role          Role      @default(CUSTOMER)
+  username     String? @unique
+  passwordHash String?
+
+  role Role?
 
   accounts Account[]
   sessions Session[]
 
   // Optional 1:1 profiles (only one will usually exist depending on role)
-  customerProfile   CustomerProfile?
-  dressmakerProfile DressmakerProfile?
+  customerProfile   CustomerProfile?   @relation("UserCustomerProfile")
+  dressmakerProfile DressmakerProfile? @relation("UserDressmakerProfile")
 
   // Relations
   sentMessages Message[]
@@ -102,17 +117,29 @@ model User {
   // Measurements
   measurements Measurement[]
 
+  //Reviews
+  reviews Review[] @relation("UserReviews")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   fileAssets FileAsset[]
+
+  status              AccountStatus       @default(PENDING_EMAIL_VERIFICATION)
+  approvedDressmakers DressmakerProfile[] @relation("DressmakerApprovedBy")
+
+  // Creates and allows for notification of new conversations
+  conversationReads ConversationRead[]
+
+  //Allow for saved dressmakers
+  savedDressmakers SavedDressmaker[]
 }
 
 model CustomerProfile {
   id     String @id @default(cuid())
   userId String @unique
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation("UserCustomerProfile", fields: [userId], references: [id], onDelete: Cascade)
 
   // Example starter fields (optional but common)
   fullName   String?
@@ -133,7 +160,7 @@ model DressmakerProfile {
   id     String @id @default(cuid())
   userId String @unique
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation("UserDressmakerProfile", fields: [userId], references: [id], onDelete: Cascade)
 
   // “detailed attributes”
   displayName     String?
@@ -141,19 +168,53 @@ model DressmakerProfile {
   location        String? // e.g., "Brooklyn, NY"
   languages       String[] // Postgres array: ["en", "es"]
   basePriceFrom   Int? // store cents? or whole currency units (see note below)
-  currency        String   @default("USD")
+  currency        String         @default("USD")
   yearsExperience Int?
   specialties     String[] // e.g., ["bridal", "eveningwear"]
   websiteUrl      String?
   instagramHandle String?
+  socialLinks     Json?
+  timezone        String?
+  payoutProfile   PayoutProfile?
 
   // Portfolio items
   portfolioItems PortfolioItem[]
 
+  // Saved dressmaker
+  savedBy SavedDressmaker[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isPublished Boolean  @default(false)
+  isPaused    Boolean  @default(false)
+
+  // NEW: approval gate
+  approvalStatus  DressmakerApprovalStatus @default(PENDING)
+  approvedAt      DateTime?
+  approvedById    String?
+  approvedBy      User?                    @relation("DressmakerApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  rejectionReason String?
+}
+
+model PayoutProfile {
+  id                  String            @id @default(cuid())
+  dressmakerProfileId String            @unique
+  dressmakerProfile   DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
+
+  provider      String  @default("PAYONEER") // extensible later
+  payoneerEmail String?
+  payoneerId    String?
+
+  legalName  String?
+  country    String?
+  address1   String?
+  address2   String?
+  city       String?
+  region     String?
+  postalCode String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  isPublished Boolean @default(false)
-  isPaused    Boolean @default(false)
 }
 
 model PortfolioItem {
@@ -182,6 +243,7 @@ model PortfolioItem {
 model Project {
   id          String        @id @default(cuid())
   projectCode String        @unique
+  title          String?
   status      ProjectStatus @default(REQUESTED)
 
   customerId   String
@@ -200,7 +262,10 @@ model Project {
 
   // Quote
   quotedTotalAmount Int?
-  currency String @default("USD")
+  currency          String @default("USD")
+
+  //Deposit Percentage
+  depositPercent Int? // 25..75 chosen by dressmaker when approving quote
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -218,17 +283,19 @@ model ProjectDetails {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  eventDate       DateTime?
-  shipByDate      DateTime?
-  fabricNotes     String?
-  referenceImages String[] // Postgres array URLs
-  fabricAgreed    Boolean @default(false)
+  eventDate        DateTime?
+  shipByDate       DateTime?
+  fabricNotes      String?
+  referenceImages  String[] // Postgres array URLs
+  fabricAgreed     Boolean   @default(false)
   fabricAgreedNote String?
 
-  requireSketch   Boolean @default(false)
-  sketchImage     String[]
+  requireSketch Boolean  @default(false)
+  sketchImage   String[]
 
-  
+  isRush      Boolean @default(false)
+  wantsCalico Boolean @default(false)
+
 
   // optional: structured fields you’ll likely want later
   colorPreferences String?
@@ -262,7 +329,7 @@ model Conversation {
   customerId   String
   dressmakerId String
   projectId    String? @unique
-  isGeneral Boolean @default(false)
+  isGeneral    Boolean @default(false)
 
   customer   User     @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Restrict)
   dressmaker User     @relation("DressmakerConversations", fields: [dressmakerId], references: [id], onDelete: Restrict)
@@ -270,8 +337,9 @@ model Conversation {
 
   messages Message[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  conversationReads ConversationRead[]
 
   // Prevent accidental duplicate conversations for same pair + same project
   @@unique([customerId, dressmakerId, projectId])
@@ -288,9 +356,9 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id], onDelete: Restrict)
 
-  text  String?
+  text        String?
   attachments String[] // S3 URLs later (optional)
-  files FileAsset[]
+  files       FileAsset[]
 
   createdAt DateTime @default(now())
 
@@ -298,20 +366,33 @@ model Message {
   @@index([senderId])
 }
 
+model ConversationRead {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
 //// PAYMENTS ////
 
 model Payment {
-  id                    String        @id @default(cuid())
-  projectId             String        @unique
-  totalAmount           Int // recommended: store in cents
-  currency              String        @default("USD")
-  status                PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
+  id          String        @id @default(cuid())
+  projectId   String        @unique
+  totalAmount Int // recommended: store in cents
+  currency    String        @default("USD")
+  status      PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
 
-  stripePaymentIntentId String?       @unique
+  stripePaymentIntentId   String? @unique
   stripeCheckoutSessionId String? // for Stripe Checkout
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -364,6 +445,11 @@ model Review {
   text      String?
   photoUrls String[] // Postgres array URLs
 
+  authorId String
+  author   User   @relation("UserReviews", fields: [authorId], references: [id], onDelete: Restrict)
+
+  isVerified Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -402,8 +488,6 @@ model FileAsset {
 
   reviewId String?
   review   Review? @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-
-  
 
   createdAt DateTime @default(now())
 
@@ -449,4 +533,20 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model SavedDressmaker {
+  id String @id @default(cuid())
+
+  customerId          String
+  dressmakerProfileId String
+
+  customer          User              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  dressmakerProfile DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, dressmakerProfileId])
+  @@index([customerId])
+  @@index([dressmakerProfileId])
 }
