@@ -1,22 +1,41 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+
+function bad(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status });
+}
+
+type AllowedRole = "CUSTOMER" | "DRESSMAKER";
+
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) return bad("Unauthorized", 401);
 
   const form = await req.formData();
-  const role = form.get("role");
+  const roleRaw = form.get("role");
 
-  // Never allow admin assignment here
-  if (role !== "CUSTOMER" && role !== "DRESSMAKER") {
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  if (typeof roleRaw !== "string") return bad("role is required");
+
+  if (roleRaw !== "CUSTOMER" && roleRaw !== "DRESSMAKER") {
+    return bad("Invalid role");
   }
 
-  // If they pick dressmaker, ensure profile exists
+  const role = roleRaw as AllowedRole;
+
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  });
+
+  if (existing?.role && existing.role !== role) {
+    return bad("Role is already set. Contact support to change it.", 409);
+  }
+
   if (role === "DRESSMAKER") {
     await prisma.user.update({
       where: { id: session.user.id },
@@ -24,7 +43,7 @@ export async function POST(req: Request) {
         role: "DRESSMAKER",
         dressmakerProfile: {
           upsert: {
-            create: {},
+            create: { languages: [], currency: "USD" },
             update: {},
           },
         },
@@ -36,14 +55,11 @@ export async function POST(req: Request) {
       data: {
         role: "CUSTOMER",
         customerProfile: {
-          upsert: {
-            create: {},
-            update: {},
-          },
+          upsert: { create: {}, update: {} },
         },
       },
     });
   }
 
-  return NextResponse.redirect(new URL("/dashboard", req.url));
+  return NextResponse.redirect(new URL("/dashboard", req.url), { status: 303 });
 }

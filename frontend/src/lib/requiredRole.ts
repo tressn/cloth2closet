@@ -20,3 +20,9 @@ export async function requireRole(allowed: Role[]) {
 export async function requireDressmaker() {
   return requireRole(["DRESSMAKER", "ADMIN"]);
 }
+
+export async function requireAssignedRole() {
+  const user = await requireUser();
+  if (!user.role) redirect("/register"); // or wherever you set role
+  return user as typeof user & { role: Role };
+}

@@ -11,6 +11,17 @@ type UploadItem = {
   error?: string;
 };
 
+type ProjectStatus =
+  | "DRAFT"
+  | "REQUESTED"
+  | "ACCEPTED"
+  | "IN_PROGRESS"
+  | "FIT_SAMPLE_SENT"
+  | "READY_TO_SHIP"
+  | "SHIPPED"
+  | "COMPLETED"
+  | "CANCELED";
+
 async function presignMessageUpload(conversationId: string, file: File) {
   const res = await fetch("/api/uploads/messages/presign", {
     method: "POST",
@@ -36,7 +47,28 @@ async function putToS3(uploadUrl: string, file: File) {
   if (!res.ok) throw new Error("Upload failed");
 }
 
-export default function MessageComposer({ conversationId }: { conversationId: string }) {
+function helperText(status?: ProjectStatus) {
+  if (status === "REQUESTED") {
+    return "Quote stage: discuss timeline, budget, measurements, fabric sourcing, shipping city, and whether rush/calico is needed.";
+  }
+  if (status === "ACCEPTED") {
+    return "Quote approved: confirm deposit amount, deadlines, and shipping details before payment.";
+  }
+  if (status === "IN_PROGRESS") {
+    return "Project active: share progress updates, fittings, and delivery timeline.";
+  }
+  return "Be clear about timeline, budget, and measurements.";
+}
+
+export default function MessageComposer({
+  conversationId,
+  projectTitle,
+  projectStatus,
+}: {
+  conversationId: string;
+  projectTitle?: string;
+  projectStatus?: ProjectStatus;
+}) {
   const [text, setText] = useState("");
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,12 +97,10 @@ export default function MessageComposer({ conversationId }: { conversationId: st
     setUploads((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  async function uploadAllQueued() {
-    const snapshot = uploads;
-
+  async function uploadAllQueued(snapshot: UploadItem[]) {
     for (let i = 0; i < snapshot.length; i++) {
-      const u = snapshot[i];
-      if (u.status !== "queued") continue;
+    const u = snapshot[i];
+    if (u.status !== "queued") continue;
 
       setUploads((prev) => prev.map((x, idx) => (idx === i ? { ...x, status: "uploading" } : x)));
 
@@ -88,15 +118,17 @@ export default function MessageComposer({ conversationId }: { conversationId: st
   }
 
   async function send() {
+    const snapshot = uploads;
+    if (snapshot.some((u) => u.status === "queued")) {
+      await uploadAllQueued(snapshot);
+    }
+
     const t = text.trim();
 
     setLoading(true);
     setError(null);
 
     try {
-      if (uploads.some((u) => u.status === "queued")) {
-        await uploadAllQueued();
-      }
 
       if (uploads.some((u) => u.status === "error")) {
         throw new Error("One or more photos failed to upload. Remove them or try again.");
@@ -106,10 +138,13 @@ export default function MessageComposer({ conversationId }: { conversationId: st
         throw new Error("Write a message or attach a photo.");
       }
 
+      // Optional: lightly prefix the message with context if user starts a new thread message
+      const payloadText = t;
+
       const res = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: t, attachments }),
+        body: JSON.stringify({ text: payloadText, attachments }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -127,7 +162,11 @@ export default function MessageComposer({ conversationId }: { conversationId: st
 
   return (
     <div className="grid gap-3">
-      <Textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message…" />
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={projectTitle ? `Message about: ${projectTitle}` : "Write a message…"}
+      />
 
       <div className="grid gap-2">
         <div className="text-[13px] text-[var(--muted)]">Attach photos (optional, up to 10)</div>
@@ -162,8 +201,8 @@ export default function MessageComposer({ conversationId }: { conversationId: st
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[13px] text-[var(--muted)]">Be clear about timeline, budget, and measurements.</div>
-        <Button type="button" onClick={send} disabled={loading} variant="primary">
+        <div className="text-[13px] text-[var(--muted)]">{text.trim().length === 0 ? helperText(projectStatus) : " "}</div>
+        <Button type="button" onClick={send} disabled={loading || (!text.trim() && uploads.length === 0)} variant="primary">
           {loading ? "Sending..." : "Send"}
         </Button>
       </div>

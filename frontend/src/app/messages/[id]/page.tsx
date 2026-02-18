@@ -118,7 +118,7 @@ export default async function ConversationPage({
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="truncate text-[15px] font-semibold text-[var(--text)]">
-                        {c.project?.projectCode ?? otherName}
+                        {c.project?.title ?? c.project?.projectCode ?? otherName}
                       </div>
                       <div className="mt-2 text-[13px] text-[var(--muted)]">
                         {lastText
@@ -154,7 +154,7 @@ export default async function ConversationPage({
   const detail = (
     <Card>
       <CardHeader
-        title={convo.project?.projectCode ?? "Conversation"}
+        title={convo.project?.title ?? convo.project?.projectCode ?? "Conversation"}
         subtitle="Messages are private between you and the other party."
       />
       <CardBody>
@@ -189,7 +189,12 @@ export default async function ConversationPage({
         </div>
 
         <div className="mt-6 border-t border-[var(--border)] pt-5">
-          <MessageComposer conversationId={convo.id} />
+          <MessageComposer
+            conversationId={convo.id}
+            projectTitle={convo.project?.title ?? convo.project?.projectCode ?? undefined}
+            projectStatus={convo.project?.status ?? undefined}
+          />
+
         </div>
       </CardBody>
     </Card>

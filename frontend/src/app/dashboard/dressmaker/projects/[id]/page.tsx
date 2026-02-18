@@ -31,7 +31,7 @@ export default async function DressmakerProjectDetailPage({
 
   return (
     <DashboardShell
-      title={project.projectCode}
+      title={project.title ?? project.projectCode}
       subtitle="Review details, then send a quote."
       tabs={[
         { label: "Back to projects", href: "/dashboard/dressmaker/projects" },
@@ -46,6 +46,10 @@ export default async function DressmakerProjectDetailPage({
             subtitle="High-level project status and links."
             right={<Badge tone="neutral">{project.status}</Badge>}
           />
+          <CardHeader title="Progress" subtitle="Track what happens next, step-by-step." />
+            <CardBody>
+              <ProjectProgress project={project} viewerRole={session.user.role ?? "DRESSMAKER"} />
+            </CardBody>
           <CardBody className="space-y-3 text-[14px] text-[var(--muted)]">
             <div>
               Quote:{" "}
@@ -65,16 +69,31 @@ export default async function DressmakerProjectDetailPage({
         </Card>
 
         <Card>
-          <CardHeader title="Project details" subtitle="Edit requirements, measurements, materials, deadlines." />
+          <CardHeader 
+            title="Project details" 
+            subtitle="Edit requirements, measurements, materials, deadlines." 
+          />
           <CardBody>
-            <ProjectDetailsEditor projectId={project.id} initial={project.details} />
+            <ProjectDetailsEditor 
+              projectId={project.id} 
+              initial={project.details} 
+            />
           </CardBody>
         </Card>
 
         <Card>
-          <CardHeader title="Quote" subtitle="Enter total in cents. This will be used for checkout." />
+          <CardHeader 
+            title="Quote" 
+            subtitle="Enter total in cents. This will be used for checkout."
+          />
           <CardBody>
-            <QuoteForm projectId={project.id} existingAmount={project.quotedTotalAmount} currency={project.currency} />
+            <QuoteForm
+                projectId={project.id}
+                existingAmount={project.quotedTotalAmount}
+                currency={project.currency}
+                existingDepositPercent={project.depositPercent}
+              />
+
           </CardBody>
         </Card>
       </div>

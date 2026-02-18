@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
-import { FilePurpose } from "@prisma/client"
 
 export async function POST(
   req: Request,
@@ -26,7 +25,10 @@ export async function POST(
   }
 
   const isMember =
-    convo.customerId === userId || convo.dressmakerId === userId || session.user.role === "ADMIN"
+    convo.customerId === userId ||
+    convo.dressmakerId === userId ||
+    session.user.role === "ADMIN"
+
   if (!isMember) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
@@ -36,14 +38,16 @@ export async function POST(
   const attachmentsRaw = body?.attachments
 
   const attachmentsParsed: string[] = Array.isArray(attachmentsRaw)
-    ? attachmentsRaw.map((u: any) => String(u).trim()).filter(Boolean)
+    ? attachmentsRaw.map((u: unknown) => String(u).trim()).filter(Boolean)
     : []
 
-  // optional: dedupe
   const attachments = Array.from(new Set(attachmentsParsed))
 
-  // ✅ validate attachment URLs BEFORE saving
-  const publicBase = process.env.S3_PUBLIC_BASE_URL!
+  const publicBase = process.env.S3_PUBLIC_BASE_URL
+  if (!publicBase) {
+    return NextResponse.json({ error: "Missing S3_PUBLIC_BASE_URL" }, { status: 500 })
+  }
+
   for (const url of attachments) {
     if (!url.startsWith(publicBase)) {
       return NextResponse.json({ error: "Invalid attachment URL" }, { status: 400 })
@@ -74,7 +78,7 @@ export async function POST(
     await prisma.fileAsset.createMany({
       data: attachments.map((url) => ({
         url,
-        purpose: FilePurpose.MESSAGE_ATTACHMENT,
+        purpose: "MESSAGE_ATTACHMENT",
         ownerId: userId,
         messageId: message.id,
         projectId: convo.projectId ?? null,

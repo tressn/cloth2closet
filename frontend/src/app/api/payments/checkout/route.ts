@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
 import Stripe from "stripe"
-import { PaymentStatus } from "@prisma/client"
 
 export const runtime = "nodejs"
 
@@ -28,7 +27,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  if (!project.payment || project.payment.status !== PaymentStatus.REQUIRES_PAYMENT_METHOD) {
+  if (!project.payment || project.payment.status !== "REQUIRES_PAYMENT_METHOD") {
     return NextResponse.json({ error: "Payment not ready" }, { status: 400 })
   }
 
@@ -44,7 +43,9 @@ export async function POST(req: Request) {
         price_data: {
           currency: project.payment.currency.toLowerCase(),
           unit_amount: project.payment.totalAmount,
-          product_data: { name: `Project ${project.projectCode}` },
+          product_data: {
+          name: `Deposit for ${project.title ?? `Project ${project.projectCode}`}`,
+        },
         },
       },
     ],
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     where: { id: project.payment.id },
     data: {
       stripeCheckoutSessionId: checkout.id,
-      status: PaymentStatus.PROCESSING,
+      status: "PROCESSING",
     },
   })
 

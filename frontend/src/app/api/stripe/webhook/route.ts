@@ -62,6 +62,25 @@ export async function POST(req: Request) {
           data: { status: ProjectStatus.IN_PROGRESS },
         })
 
+        const proj = await prisma.project.findUnique({
+          where: { id: updatedPayment.projectId },
+          select: { id: true, dressmakerId: true, title: true, projectCode: true },
+        });
+
+        if (proj) {
+          await prisma.notification.create({
+            data: {
+              userId: proj.dressmakerId,
+              type: "PAYMENT_SUCCEEDED",
+              title: "Deposit received",
+              body: proj.title ?? proj.projectCode,
+              href: `/dashboard/dressmaker/projects/${proj.id}`,
+              projectId: proj.id,
+            },
+          });
+        }
+
+
         break
       }
 

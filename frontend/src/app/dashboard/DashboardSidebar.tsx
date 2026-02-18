@@ -78,6 +78,12 @@ export default async function DashboardSidebar() {
                 label="Home"
                 hint="Overview + quick actions"
               />
+              <NavLink
+                href="/dashboard/notifications"
+                label="Notifications"
+                hint="Quote + payment updates"
+              />
+
 
               {/* Customer */}
               {(isCustomer || isAdmin) && (
@@ -87,6 +93,12 @@ export default async function DashboardSidebar() {
                     label="Projects"
                     hint="Quotes, payments, updates"
                   />
+                  <NavLink
+                    href="/dashboard/customer/quotes"
+                    label="Quotes"
+                    hint="Requests + approved quotes"
+                  />
+
                   <NavLink
                     href="/dashboard/customer/measurements"
                     label="Measurements"
@@ -122,6 +134,12 @@ export default async function DashboardSidebar() {
                       label="Projects"
                       hint="Requests + quoting"
                     />
+                    <NavLink
+                      href="/dashboard/dressmaker/quotes"
+                      label="My Quotes"
+                      hint="New requests waiting"
+                    />
+
                   </div>
                 </>
               ) : (

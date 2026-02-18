@@ -40,12 +40,21 @@ export default async function CustomerProjectDetailPage({
         { label: "Measurements", href: "/dashboard/customer/measurements" },
       ]}
     >
+      
       <div className="max-w-4xl space-y-6">
         <Card>
           <CardHeader
             title="Overview"
             right={<Badge tone="neutral">{project.status}</Badge>}
           />
+        </Card>
+
+        <Card>
+          <CardHeader title="Progress" subtitle="Track what happens next, step-by-step." />
+          <CardBody>
+            <ProjectProgress project={project} viewerRole={session.user.role ?? "CUSTOMER"} />
+          </CardBody>
+
           <CardBody className="space-y-3 text-[14px] text-[var(--muted)]">
             <div>
               Quote:{" "}

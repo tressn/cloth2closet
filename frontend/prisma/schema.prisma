@@ -81,6 +81,34 @@ enum AccountStatus {
   SUSPENDED
 }
 
+enum NotificationType {
+  QUOTE_REQUESTED
+  QUOTE_APPROVED
+  PAYMENT_SUCCEEDED
+  PROJECT_UPDATE
+  SUPPORT_TICKET_CREATED
+}
+
+enum LabelStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SupportCategory {
+  ACCOUNT_ROLE
+  PAYMENTS
+  DISPUTE
+  TECHNICAL
+  OTHER
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
 //// CORE MODELS ////
 
 model User {
@@ -133,6 +161,13 @@ model User {
 
   //Allow for saved dressmakers
   savedDressmakers SavedDressmaker[]
+  notifications    Notification[]
+
+  //sketch Submission
+  sketchSubmissionsMade     SketchSubmission[] @relation("SketchSubmittedBy")
+  sketchSubmissionsApproved SketchSubmission[] @relation("SketchApprovedBy")
+  labels                    Label[]
+  supportTickets            SupportTicket[]
 }
 
 model CustomerProfile {
@@ -243,7 +278,7 @@ model PortfolioItem {
 model Project {
   id          String        @id @default(cuid())
   projectCode String        @unique
-  title          String?
+  title       String?
   status      ProjectStatus @default(REQUESTED)
 
   customerId   String
@@ -270,7 +305,13 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  fileAssets FileAsset[]
+  fileAssets             FileAsset[]
+  notifications          Notification[]
+  projectMeasurementGate ProjectMeasurementGate?
+  sketchSubmission       SketchSubmission?
+  projectShipping        ProjectShipping?
+  projectLabels          ProjectLabel[]
+  supportTickets         SupportTicket[]
 
   @@index([customerId])
   @@index([dressmakerId])
@@ -296,6 +337,28 @@ model ProjectDetails {
   isRush      Boolean @default(false)
   wantsCalico Boolean @default(false)
 
+  // ✅ NEW: gates for workflow
+  sketchSubmittedAt DateTime?
+  sketchApprovedAt  DateTime?
+
+  measurementsRequested               String[] // e.g. ["inseam","sleeveLength"]
+  measurementsConfirmedByDressmakerAt DateTime?
+  measurementsConfirmedByCustomerAt   DateTime?
+
+  fitSampleSentAt     DateTime? // dressmaker says “sent”
+  fitSampleReceivedAt DateTime? // customer confirms “received”
+
+  finalImages      String[]
+  finalSubmittedAt DateTime?
+  finalApprovedAt  DateTime?
+
+  shippingCarrier        String?
+  shippingTrackingNumber String?
+  shippedAt              DateTime?
+
+  completedAt  DateTime?
+  canceledAt   DateTime?
+  cancelReason String?
 
   // optional: structured fields you’ll likely want later
   colorPreferences String?
@@ -320,6 +383,22 @@ model Measurement {
   updatedAt DateTime @updatedAt
 
   @@index([customerId])
+}
+
+model ProjectMeasurementGate {
+  id        String  @id @default(cuid())
+  projectId String  @unique
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // dressmaker requests / checklist
+  requestedFields       String[] // ["inseam", "sleeveLength"]
+  dressmakerConfirmedAt DateTime?
+
+  // customer confirms they updated measurements
+  customerConfirmedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 //// MESSAGING ////
@@ -549,4 +628,109 @@ model SavedDressmaker {
   @@unique([customerId, dressmakerProfileId])
   @@index([customerId])
   @@index([dressmakerProfileId])
+}
+
+// For notification page 
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+//Sketch Submission
+model SketchSubmission {
+  id        String  @id @default(cuid())
+  projectId String  @unique
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  submittedById String
+  submittedBy   User   @relation("SketchSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+
+  imageUrls String[]
+  note      String?
+
+  approvedAt   DateTime?
+  approvedById String?
+  approvedBy   User?     @relation("SketchApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([submittedById])
+  @@index([approvedById])
+}
+
+//Shipping
+model ProjectShipping {
+  id        String  @id @default(cuid())
+  projectId String  @unique
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  carrier        String?
+  trackingNumber String?
+  shippedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// labels status to set label standards
+model Label {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  status      LabelStatus @default(PENDING)
+  createdById String?
+  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  projectLabels ProjectLabel[]
+}
+
+model ProjectLabel {
+  id        String @id @default(cuid())
+  projectId String
+  labelId   String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label   Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, labelId])
+  @@index([projectId])
+}
+
+//support tickets
+model SupportTicket {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  category       SupportCategory
+  subject        String
+  message        String
+  attachmentUrls String[]
+
+  status SupportStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
