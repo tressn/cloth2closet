@@ -19,7 +19,13 @@ export function Card({
   );
 }
 
-export function CardBody({ children }: { children: React.ReactNode }) {
+export function CardBody({ 
+  children, 
+  className = "", 
+}: { 
+  children: React.ReactNode;
+  className?: string;
+ }) {
   return <div className="px-6 py-6">{children}</div>;
 }
 

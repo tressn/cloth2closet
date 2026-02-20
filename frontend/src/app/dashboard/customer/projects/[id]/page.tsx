@@ -7,6 +7,8 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import ProjectProgress from "@/app/components/projects/ProjectProgress";
+
 
 export default async function CustomerProjectDetailPage({
   params,

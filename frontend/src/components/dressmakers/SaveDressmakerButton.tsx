@@ -5,11 +5,9 @@ import { useState } from "react";
 export default function SaveDressmakerButton({
   dressmakerProfileId,
   initialSaved = false,
-  isAuthed = true,
 }: {
   dressmakerProfileId: string;
-  initialSaved: boolean;
-  isAuthed?: boolean;
+  initialSaved?: boolean;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loading, setLoading] = useState(false);
@@ -22,7 +20,8 @@ export default function SaveDressmakerButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dressmakerProfileId }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Failed");
       setSaved(!saved);
     } finally {
       setLoading(false);

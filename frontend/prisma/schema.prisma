@@ -47,6 +47,7 @@ enum MilestoneStatus {
   PAID
   RELEASED
   CANCELED
+  REFUNDED
 }
 
 enum TransferStatus {
@@ -87,6 +88,8 @@ enum NotificationType {
   PAYMENT_SUCCEEDED
   PROJECT_UPDATE
   SUPPORT_TICKET_CREATED
+  PAYMENT_REFUNDED
+  DISPUTE_OPENED
 }
 
 enum LabelStatus {
@@ -107,6 +110,11 @@ enum SupportStatus {
   OPEN
   IN_PROGRESS
   CLOSED
+}
+
+enum MilestoneType {
+  DEPOSIT
+  FINAL
 }
 
 //// CORE MODELS ////
@@ -236,7 +244,17 @@ model PayoutProfile {
   dressmakerProfileId String            @unique
   dressmakerProfile   DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
 
-  provider      String  @default("PAYONEER") // extensible later
+  provider String @default("STRIPE") // STRIPE | PAYONEER later
+
+  // Stripe Connect
+  stripeAccountId String? @unique
+
+  // Optional: store readiness snapshot
+  payoutsEnabled   Boolean @default(false)
+  detailsSubmitted Boolean @default(false)
+  requirementsJson Json?
+
+  // Payoneer (fallback later)
   payoneerEmail String?
   payoneerId    String?
 
@@ -485,19 +503,31 @@ model Milestone {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  type   MilestoneType
   title  String
-  amount Int // cents
+  amount Int
   status MilestoneStatus @default(PENDING)
   dueAt  DateTime?
 
-  // Transfer (1:1 optional)
+  // Stripe identifiers per milestone charge
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String? @unique
+
+  // When we are allowed to pay out (for final: dispute window delay)
+  payoutEligibleAt DateTime?
+  paidAt           DateTime?
+  releasedAt       DateTime?
+
+  // Transfer (1:1 optional) — you already have this
   transfer Transfer?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([projectId, type])
   @@index([projectId])
   @@index([status])
+  @@index([payoutEligibleAt])
 }
 
 model Transfer {
@@ -733,4 +763,19 @@ model SupportTicket {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+model AdminActionLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([entity, entityId])
+  @@index([adminId, createdAt])
 }

@@ -64,7 +64,7 @@ function fmtDate(d: any) {
 }
 
 async function postAction(projectId: string, payload: any) {
-  const res = await fetch(`/api/projects/${projectId}/status`, {
+  const res = await fetch(`/api/projects/${projectId}/workflow`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

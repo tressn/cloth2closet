@@ -6,6 +6,8 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import ProfileForm from "./ProfileForm";
 import PublishToggle from "./PublishToggle";
+import SetupPayoutButton from "./SetupPayoutButton";
+
 
 export default async function DressmakerProfilePage() {
   const session = await getServerSession(authOptions);
@@ -14,6 +16,7 @@ export default async function DressmakerProfilePage() {
 
   const profile = await prisma.dressmakerProfile.findUnique({
     where: { userId: session.user.id },
+    include: { payoutProfile: true }
   });
 
   if (!profile) redirect("/become-dressmaker");
@@ -54,6 +57,39 @@ export default async function DressmakerProfilePage() {
               </div>
             </CardBody>
           </Card>
+
+          <Card>
+            <CardHeader
+              title="Payouts"
+              subtitle="Set up payouts so you can receive money from projects."
+            />
+            <CardBody className="space-y-3">
+              {profile.payoutProfile?.stripeAccountId ? (
+                profile.payoutProfile.payoutsEnabled ? (
+                  <div className="text-[14px]">
+                    <span className="font-medium">Status:</span>{" "}
+                    <span className="text-green-600">Payouts enabled</span>
+                  </div>
+                ) : (
+                  <div className="text-[14px]">
+                    <span className="font-medium">Status:</span>{" "}
+                    <span className="text-amber-600">Setup incomplete</span>
+                    <div className="mt-1 text-[13px] text-[var(--muted)]">
+                      Stripe needs more information before payouts can be sent.
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="text-[14px]">
+                  <span className="font-medium">Status:</span>{" "}
+                  <span className="text-amber-600">Not set up</span>
+                </div>
+              )}
+
+              <SetupPayoutButton />
+            </CardBody>
+          </Card>
+
 
           <Card>
             <CardHeader title="Quick links" />

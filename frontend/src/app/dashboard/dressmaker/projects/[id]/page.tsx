@@ -8,6 +8,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import QuoteForm from "./QuoteForm";
 import ProjectDetailsEditor from "@/app/components/ProjectDetailsEditor";
+import ProjectProgress from "@/app/components/projects/ProjectProgress";
+
 
 export default async function DressmakerProjectDetailPage({
   params,

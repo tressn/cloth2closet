@@ -22,8 +22,11 @@ export default async function DressmakerPublicPage({
     where: { id },
     include: { portfolioItems: { orderBy: { createdAt: "desc" } } },
   });
+
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id ?? null;
+
+  if (!dressmaker) notFound();
 
   const isSaved = userId
     ? !!(await prisma.savedDressmaker.findUnique({
@@ -36,8 +39,6 @@ export default async function DressmakerPublicPage({
         select: { id: true },
       }))
     : false;
-
-  if (!dressmaker) notFound();
 
   return (
     <div className="bg-[var(--bg)]">
@@ -64,7 +65,7 @@ export default async function DressmakerPublicPage({
                     <Badge tone="neutral">
                       💰{" "}
                       {dressmaker.basePriceFrom != null
-                        ? `${formatCents(dressmaker.basePriceFrom)} ${dressmaker.currency}`
+                        ? `${formatWhole(dressmaker.basePriceFrom)} ${dressmaker.currency}`
                         : "Pricing not listed"}
                     </Badge>
 
@@ -202,6 +203,6 @@ export default async function DressmakerPublicPage({
   );
 }
 
-function formatCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
+function formatWhole(amount: number) {
+  return `$${amount}`;
 }
