@@ -1,86 +1,131 @@
-import { NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/authOptions"
-import { prisma } from "@/lib/prisma"
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { prisma } from "@/lib/prisma";
+import { CURRENCY_SET } from "@/lib/currencies";
+import { COUNTRY_SET } from "@/lib/lookups/countries";
+
+const LANGUAGE_SET = new Set(["en", "fr", "es", "de", "it", "pt"]);
+
+function normalizeName(name: string) {
+  return name.trim().replace(/\s+/g, " ");
+}
+function slugify(name: string) {
+  return normalizeName(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
 
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
-  }
-
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   if (session.user.role !== "DRESSMAKER" && session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json()
+  const body = await req.json().catch(() => ({}));
 
-  const {
-    displayName,
-    bio,
-    location,
-    languages,
-    basePriceFrom,
-    currency,
-    yearsExperience,
-    specialties,
-    websiteUrl,
-    instagramHandle,
-  } = body
+  const countryCode =
+    typeof body.countryCode === "string" ? body.countryCode.trim().toUpperCase() : "";
+  const timezoneIana =
+    typeof body.timezoneIana === "string" ? body.timezoneIana.trim() : "";
 
-  // Light validation (beginner-friendly)
-  const safeDisplayName =
-    typeof displayName === "string" ? displayName.trim() : null
+  // ✅ country validation against static set
+  if (countryCode && !COUNTRY_SET.has(countryCode)) {
+    return NextResponse.json({ error: "Invalid country" }, { status: 400 });
+  }
 
-  const safeLanguages = Array.isArray(languages)
-    ? languages.map((x) => String(x).trim()).filter(Boolean)
-    : []
-
-  const safeSpecialties = Array.isArray(specialties)
-    ? specialties.map((x) => String(x).trim()).filter(Boolean)
-    : []
+  const safeDisplayName = typeof body.displayName === "string" ? body.displayName.trim() : null;
 
   const safeBasePriceFrom =
-    typeof basePriceFrom === "number" && Number.isFinite(basePriceFrom)
-      ? Math.max(0, Math.trunc(basePriceFrom))
-      : null
+    typeof body.basePriceFrom === "number" && Number.isFinite(body.basePriceFrom)
+      ? Math.max(0, Math.trunc(body.basePriceFrom))
+      : null;
 
   const safeYearsExperience =
-    typeof yearsExperience === "number" && Number.isFinite(yearsExperience)
-      ? Math.max(0, Math.trunc(yearsExperience))
-      : null
+    typeof body.yearsExperience === "number" && Number.isFinite(body.yearsExperience)
+      ? Math.max(0, Math.trunc(body.yearsExperience))
+      : null;
 
-  const safeCurrency =
-    typeof currency === "string" && currency.trim().length > 0
-      ? currency.trim().toUpperCase()
-      : "USD"
+  const currency =
+    typeof body.currency === "string" && body.currency.trim().length
+      ? body.currency.trim().toUpperCase()
+      : "USD";
+
+  if (!CURRENCY_SET.has(currency)) {
+    return NextResponse.json({ error: "Unsupported currency" }, { status: 400 });
+  }
+
+  // Languages as string[] (codes)
+  const languageCodes: string[] = Array.isArray(body.languageCodes)
+    ? body.languageCodes.map((x: any) => String(x).trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  const invalidLangs = languageCodes.filter((c) => !LANGUAGE_SET.has(c));
+  if (invalidLangs.length) {
+    return NextResponse.json({ error: `Invalid languages: ${invalidLangs.join(", ")}` }, { status: 400 });
+  }
+
+  // Specialties (Label)
+  const safeSpecialties = Array.isArray(body.specialties)
+    ? body.specialties.map((x: any) => normalizeName(String(x))).filter(Boolean)
+    : [];
 
   const safeWebsiteUrl =
-    typeof websiteUrl === "string" && websiteUrl.trim().length > 0
-      ? websiteUrl.trim()
-      : null
+    typeof body.websiteUrl === "string" && body.websiteUrl.trim().length > 0 ? body.websiteUrl.trim() : null;
 
   const safeInstagramHandle =
-    typeof instagramHandle === "string" && instagramHandle.trim().length > 0
-      ? instagramHandle.trim().replace(/^@/, "") // store without @
-      : null
+    typeof body.instagramHandle === "string" && body.instagramHandle.trim().length > 0
+      ? body.instagramHandle.trim().replace(/^@/, "")
+      : null;
 
+  // ✅ IMPORTANT: this assumes DressmakerProfile has fields countryCode + timezoneIana + languages
   const updated = await prisma.dressmakerProfile.update({
     where: { userId: session.user.id },
     data: {
       displayName: safeDisplayName,
-      bio: typeof bio === "string" ? bio : null,
-      location: typeof location === "string" ? location : null,
-      languages: safeLanguages,
+      bio: typeof body.bio === "string" ? body.bio : null,
+
+      countryCode: countryCode || null,
+      timezoneIana: timezoneIana || null,
+
+      languages: languageCodes,
+
       basePriceFrom: safeBasePriceFrom,
-      currency: safeCurrency,
+      currency,
       yearsExperience: safeYearsExperience,
-      specialties: safeSpecialties,
+
       websiteUrl: safeWebsiteUrl,
       instagramHandle: safeInstagramHandle,
     },
-  })
+    select: { id: true },
+  });
 
-  return NextResponse.json({ ok: true, profile: updated })
+  await prisma.dressmakerSpecialty.deleteMany({
+    where: { dressmakerProfileId: updated.id },
+  });
+
+  for (const s of safeSpecialties) {
+    const slug = slugify(s);
+    if (!slug) continue;
+
+    const label = await prisma.label.upsert({
+      where: { scope_slug: { scope: "SPECIALTY", slug } },
+      update: {},
+      create: {
+        name: s,
+        slug,
+        scope: "SPECIALTY",
+        status: "PENDING",
+        createdById: session.user.id,
+      },
+    });
+
+    await prisma.dressmakerSpecialty.create({
+      data: { dressmakerProfileId: updated.id, labelId: label.id },
+    });
+  }
+
+  return NextResponse.json({ ok: true });
 }

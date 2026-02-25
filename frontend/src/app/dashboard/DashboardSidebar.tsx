@@ -154,6 +154,42 @@ export default async function DashboardSidebar() {
                 </div>
               )}
 
+              {/* Admin */}
+              {isAdmin ? (
+                <>
+                  <div className="mt-3 text-[12px] font-medium text-[var(--muted)]">
+                    Admin
+                  </div>
+                  <div className="mt-2 grid gap-2">
+                    <NavLink
+                      href="/dashboard/admin/dressmakers"
+                      label="Dressmakers"
+                      hint="Approve / review makers"
+                    />
+                    <NavLink
+                      href="/dashboard/admin/labels"
+                      label="Labels"
+                      hint="Approve / reject tags"
+                    />
+                    <NavLink
+                      href="/dashboard/admin/payouts"
+                      label="Payouts"
+                      hint="Release milestone payouts"
+                    />
+                    <NavLink
+                      href="/dashboard/admin/support"
+                      label="Support"
+                      hint="User support tickets"
+                    />
+                    <NavLink
+                      href="/dashboard/admin/users"
+                      label="Users"
+                      hint="Accounts + admin actions"
+                    />
+                  </div>
+                </>
+              ) : null}
+
               <div className="mt-4 border-t border-[var(--border)] pt-4">
                 <Link href="/api/auth/signout?callbackUrl=/login">
                   Sign out

@@ -16,7 +16,12 @@ export default async function DressmakerProfilePage() {
 
   const profile = await prisma.dressmakerProfile.findUnique({
     where: { userId: session.user.id },
-    include: { payoutProfile: true }
+    include: {
+      payoutProfile: true,
+      dressmakerSpecialties: {
+        include: { label: true },
+      },
+    },
   });
 
   if (!profile) redirect("/become-dressmaker");
@@ -39,7 +44,16 @@ export default async function DressmakerProfilePage() {
               subtitle="These are shown on your public dressmaker page."
             />
             <CardBody>
-              <ProfileForm initialProfile={profile} />
+              <ProfileForm
+                initialProfile={{
+                  ...profile,
+                  languageCodes: profile.languages ?? [],
+                  specialties: profile.dressmakerSpecialties
+                    .map((x) => x.label)
+                    .filter((l) => l.scope === "SPECIALTY" && l.status !== "REJECTED")
+                    .map((l) => l.slug),
+                }}
+              />
             </CardBody>
           </Card>
         </div>

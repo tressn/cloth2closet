@@ -7,20 +7,20 @@ import { Button } from "@/components/ui/Button";
 import { MeasurementInfoIcon } from "@/components/measurements/MeasurementInfoIcon";
 
 export default function MeasurementsForm({ initial }: { initial: any | null }) {
-  const [height, setHeight] = useState(initial?.heightIn ?? "");
-  const [bust, setBust] = useState(initial?.bustIn ?? "");
-  const [waist, setWaist] = useState(initial?.waistIn ?? "");
-  const [hips, setHips] = useState(initial?.hipsIn ?? "");
-  const [shoulderToNipple, setShoulderToNipple] = useState(initial?.shoulderToNippleIn ?? "");
-  const [shoulderToUnderbust, setShoulderToUnderbust] = useState(initial?.shoulderToUnderbustIn ?? "");
-  const [shoulderToWaist, setShoulderToWaist] = useState(initial?.shoulderToWaistIn ?? "");
-  const [aroundBellyButton, setAroundBellyButton] = useState(initial?.aroundBellyButtonIn ?? "");
-  const [aroundLowerBelly, setAroundLowerBelly] = useState(initial?.aroundLowerBellyIn ?? "");
-  const [acrossBack, setAcrossBack] = useState(initial?.acrossBackIn ?? "");
-  const [aroundArm, setAroundArm] = useState(initial?.aroundArmIn ?? "");
-  const [sleeveLength, setSleeveLength] = useState(initial?.sleeveLengthIn ?? "");
-  const [shoulderToButt, setShoulderToButt] = useState(initial?.shoulderToButtIn ?? "");
-  const [fullLength, setFullLength] = useState(initial?.fullLengthIn ?? "");
+  const [height, setHeight] = useState(initial?.heightCm ?? "");
+  const [bust, setBust] = useState(initial?.bustCm ?? "");
+  const [waist, setWaist] = useState(initial?.waistCm ?? "");
+  const [hips, setHips] = useState(initial?.hipsCm ?? "");
+  const [shoulderToNipple, setShoulderToNipple] = useState(initial?.shoulderToNippleCm ?? "");
+  const [shoulderToUnderbust, setShoulderToUnderbust] = useState(initial?.shoulderToUnderbustCm ?? "");
+  const [shoulderToWaist, setShoulderToWaist] = useState(initial?.shoulderToWaistCm ?? "");
+  const [aroundBellyButton, setAroundBellyButton] = useState(initial?.aroundBellyButtonCm ?? "");
+  const [aroundLowerBelly, setAroundLowerBelly] = useState(initial?.aroundLowerBellyCm ?? "");
+  const [acrossBack, setAcrossBack] = useState(initial?.acrossBackCm ?? "");
+  const [aroundArm, setAroundArm] = useState(initial?.aroundArmCm ?? "");
+  const [sleeveLength, setSleeveLength] = useState(initial?.sleeveLengthCm ?? "");
+  const [shoulderToButt, setShoulderToButt] = useState(initial?.shoulderToButtCm ?? "");
+  const [fullLength, setFullLength] = useState(initial?.fullLengthCm ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
 
   const [msg, setMsg] = useState<string | null>(null);
@@ -35,20 +35,20 @@ export default function MeasurementsForm({ initial }: { initial: any | null }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fieldsJson: {
-          heightIn: height,
-          bustIn: bust,
-          waistIn: waist,
-          hipsIn: hips,
-          shoulderToNippleIn: shoulderToNipple,
-          shoulderToUnderbustIn: shoulderToUnderbust,
-          shoulderToWaistIn: shoulderToWaist,
-          aroundBellyButtonIn: aroundBellyButton,
-          aroundLowerBellyIn: aroundLowerBelly,
-          acrossBackIn: acrossBack,
-          aroundArmIn: aroundArm,
-          sleeveLengthIn: sleeveLength,
-          shoulderToButtIn: shoulderToButt,
-          fullLengthIn: fullLength,
+          heightCm: height,
+          bustCm: bust,
+          waistCm: waist,
+          hipsCm: hips,
+          shoulderToNippleCm: shoulderToNipple,
+          shoulderToUnderbustCm: shoulderToUnderbust,
+          shoulderToWaistCm: shoulderToWaist,
+          aroundBellyButtonCm: aroundBellyButton,
+          aroundLowerBellyCm: aroundLowerBelly,
+          acrossBackCm: acrossBack,
+          aroundArmCm: aroundArm,
+          sleeveLengthCm: sleeveLength,
+          shoulderToButtCm: shoulderToButt,
+          fullLengthCm: fullLength,
           notes,
         },
       }),
@@ -77,33 +77,33 @@ export default function MeasurementsForm({ initial }: { initial: any | null }) {
     <div className="grid gap-6">
       <Section title="Core">
         <Grid>
-          <Field label="Height (cm)" helpKey="heightIn"><Input value={height} onChange={(e) => setHeight(e.target.value)} /></Field>
-          <Field label="Bust (cm)" helpKey="bustIn"><Input value={bust} onChange={(e) => setBust(e.target.value)} /></Field>
-          <Field label="Waist (cm)" helpKey="waistIn"><Input value={waist} onChange={(e) => setWaist(e.target.value)} /></Field>
-          <Field label="Hips (cm)" helpKey="hipsIn"><Input value={hips} onChange={(e) => setHips(e.target.value)} /></Field>
+          <Field label="Height (cm)" helpKey="heightCm"><Input value={height} onChange={(e) => setHeight(e.target.value)} /></Field>
+          <Field label="Bust (cm)" helpKey="bustCm"><Input value={bust} onChange={(e) => setBust(e.target.value)} /></Field>
+          <Field label="Waist (cm)" helpKey="waistCm"><Input value={waist} onChange={(e) => setWaist(e.target.value)} /></Field>
+          <Field label="Hips (cm)" helpKey="hipsCm"><Input value={hips} onChange={(e) => setHips(e.target.value)} /></Field>
         </Grid>
       </Section>
 
       <Section title="Torso & fit">
         <Grid>
-          <Field label="Shoulder → nipple (cm)" helpKey="shoulderToNippleIn"><Input value={shoulderToNipple} onChange={(e) => setShoulderToNipple(e.target.value)} /></Field>
-          <Field label="Shoulder → underbust (cm)" helpKey="shoulderToUnderbustIn"><Input value={shoulderToUnderbust} onChange={(e) => setShoulderToUnderbust(e.target.value)} /></Field>
-          <Field label="Shoulder → waist (cm)" helpKey="shoulderToWaistIn"><Input value={shoulderToWaist} onChange={(e) => setShoulderToWaist(e.target.value)} /></Field>
-          <Field label="Across back (cm)" helpKey="acrossBackIn"><Input value={acrossBack} onChange={(e) => setAcrossBack(e.target.value)} /></Field>
+          <Field label="Shoulder → nipple (cm)" helpKey="shoulderToNippleCm"><Input value={shoulderToNipple} onChange={(e) => setShoulderToNipple(e.target.value)} /></Field>
+          <Field label="Shoulder → underbust (cm)" helpKey="shoulderToUnderbustCm"><Input value={shoulderToUnderbust} onChange={(e) => setShoulderToUnderbust(e.target.value)} /></Field>
+          <Field label="Shoulder → waist (cm)" helpKey="shoulderToWaistCm"><Input value={shoulderToWaist} onChange={(e) => setShoulderToWaist(e.target.value)} /></Field>
+          <Field label="Across back (cm)" helpKey="acrossBackCm"><Input value={acrossBack} onChange={(e) => setAcrossBack(e.target.value)} /></Field>
         </Grid>
 
         <Grid>
-          <Field label="Around belly button (cm)" helpKey="aroundBellyButtonIn"><Input value={aroundBellyButton} onChange={(e) => setAroundBellyButton(e.target.value)} /></Field>
-          <Field label="Around lower belly (cm)" helpKey="aroundLowerBellyIn"><Input value={aroundLowerBelly} onChange={(e) => setAroundLowerBelly(e.target.value)} /></Field>
+          <Field label="Around belly button (cm)" helpKey="aroundBellyButtonCm"><Input value={aroundBellyButton} onChange={(e) => setAroundBellyButton(e.target.value)} /></Field>
+          <Field label="Around lower belly (cm)" helpKey="aroundLowerBellyCm"><Input value={aroundLowerBelly} onChange={(e) => setAroundLowerBelly(e.target.value)} /></Field>
         </Grid>
       </Section>
 
       <Section title="Arms & length">
         <Grid>
-          <Field label="Around arm (cm)" helpKey="aroundArmIn"><Input value={aroundArm} onChange={(e) => setAroundArm(e.target.value)} /></Field>
-          <Field label="Sleeve length (cm)" helpKey="sleeveLengthIn"><Input value={sleeveLength} onChange={(e) => setSleeveLength(e.target.value)} /></Field>
-          <Field label="Shoulder → butt (cm)" helpKey="shoulderToButtIn"><Input value={shoulderToButt} onChange={(e) => setShoulderToButt(e.target.value)} /></Field>
-          <Field label="Full length (cm)" helpKey="fullLengthIn"><Input value={fullLength} onChange={(e) => setFullLength(e.target.value)} /></Field>
+          <Field label="Around arm (cm)" helpKey="aroundArmCm"><Input value={aroundArm} onChange={(e) => setAroundArm(e.target.value)} /></Field>
+          <Field label="Sleeve length (cm)" helpKey="sleeveLengthCm"><Input value={sleeveLength} onChange={(e) => setSleeveLength(e.target.value)} /></Field>
+          <Field label="Shoulder → butt (cm)" helpKey="shoulderToButtCm"><Input value={shoulderToButt} onChange={(e) => setShoulderToButt(e.target.value)} /></Field>
+          <Field label="Full length (cm)" helpKey="fullLengthCm"><Input value={fullLength} onChange={(e) => setFullLength(e.target.value)} /></Field>
         </Grid>
       </Section>
 

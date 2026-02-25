@@ -111,7 +111,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { details: true, payment: true },
+    include: { details: true, payment: true, projectShipping: true },
   });
   if (!project) return bad("Project not found", 404);
 
@@ -380,9 +380,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         if (!trackingNumber) throw new Error("trackingNumber is required.");
 
-        detailsUpdate.shippingTrackingNumber = trackingNumber;
-        detailsUpdate.shippingCarrier = carrier;
-        detailsUpdate.shippedAt = now;
+        
+        await prisma.projectShipping.upsert({
+          where: { projectId: project.id },
+          create: {
+            projectId: project.id,
+            carrier: carrier,
+            trackingNumber,
+            shippedAt: now,
+          },
+          update: {
+            carrier: carrier,
+            trackingNumber,
+            shippedAt: now,
+          },
+        });
 
         projectUpdate.status = ProjectStatus.SHIPPED;
 
@@ -406,7 +418,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (!details.shippedAt) throw new Error("Missing shippedAt.");
 
         // Optional: enforce 14-day completion window
-        const shippedAt = new Date(details.shippedAt);
+        const shippedAtValue = project.projectShipping?.shippedAt;
+        if (!shippedAtValue) throw new Error("Missing shippedAt.");
+
+        // Optional: enforce 14-day completion window
+        const shippedAt = new Date(shippedAtValue);
         const days = Math.floor((now.getTime() - shippedAt.getTime()) / (1000 * 60 * 60 * 24));
         if (days > 14 && !isAdmin) {
           throw new Error("Completion window expired (more than 14 days since shipped). Contact support.");
@@ -470,7 +486,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           update: detailsUpdate,
         },
       },
-      include: { details: true, payment: true },
+      include: { details: true, payment: true, projectShipping: true },
     });
 
     return NextResponse.json({ ok: true, project: updated });

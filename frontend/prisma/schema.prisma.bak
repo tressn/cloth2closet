@@ -1,0 +1,657 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                        String              @id @default(cuid())
+  email                     String              @unique
+  role                      Role?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  emailVerified             DateTime?
+  image                     String?
+  name                      String?
+  passwordHash              String?
+  username                  String?             @unique
+  status                    AccountStatus       @default(PENDING_EMAIL_VERIFICATION)
+  accounts                  Account[]
+  adminActionLogs           AdminActionLog[]
+  customerConversations     Conversation[]      @relation("CustomerConversations")
+  dressmakerConversations   Conversation[]      @relation("DressmakerConversations")
+  conversationReads         ConversationRead[]
+  customerProfile           CustomerProfile?    @relation("UserCustomerProfile")
+  approvedDressmakers       DressmakerProfile[] @relation("DressmakerApprovedBy")
+  dressmakerProfile         DressmakerProfile?  @relation("UserDressmakerProfile")
+  fileAssets                FileAsset[]
+  labels                    Label[]
+  measurements              Measurement[]
+  sentMessages              Message[]
+  notifications             Notification[]
+  customerProjects          Project[]           @relation("CustomerProjects")
+  dressmakerProjects        Project[]           @relation("DressmakerProjects")
+  reviews                   Review[]            @relation("UserReviews")
+  savedDressmakers          SavedDressmaker[]
+  sessions                  Session[]
+  sketchSubmissionsApproved SketchSubmission[]  @relation("SketchApprovedBy")
+  sketchSubmissionsMade     SketchSubmission[]  @relation("SketchSubmittedBy")
+  supportTickets            SupportTicket[]
+}
+
+model CustomerProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  fullName   String?
+  phone      String?
+  timezone   String?
+  address1   String?
+  address2   String?
+  city       String?
+  region     String?
+  postalCode String?
+  country    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation("UserCustomerProfile", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DressmakerProfile {
+  id                    String                   @id @default(cuid())
+  userId                String                   @unique
+  displayName           String?
+  bio                   String?
+  location              String?
+  languages             String[]
+  basePriceFrom         Int?
+  currency              String                   @default("USD")
+  yearsExperience       Int?
+  specialties           String[]
+  websiteUrl            String?
+  instagramHandle       String?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  isPaused              Boolean                  @default(false)
+  isPublished           Boolean                  @default(false)
+  approvalStatus        DressmakerApprovalStatus @default(PENDING)
+  approvedAt            DateTime?
+  approvedById          String?
+  rejectionReason       String?
+  socialLinks           Json?
+  timezone              String?
+  approvedBy            User?                    @relation("DressmakerApprovedBy", fields: [approvedById], references: [id])
+  user                  User                     @relation("UserDressmakerProfile", fields: [userId], references: [id], onDelete: Cascade)
+  dressmakerSpecialties DressmakerSpecialty[]
+  payoutProfile         PayoutProfile?
+  portfolioItems        PortfolioItem[]
+  savedBy               SavedDressmaker[]
+}
+
+model PayoutProfile {
+  id                  String            @id @default(cuid())
+  dressmakerProfileId String            @unique
+  provider            String            @default("STRIPE")
+  payoneerEmail       String?
+  payoneerId          String?
+  legalName           String?
+  country             String?
+  address1            String?
+  address2            String?
+  city                String?
+  region              String?
+  postalCode          String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  detailsSubmitted    Boolean           @default(false)
+  payoutsEnabled      Boolean           @default(false)
+  requirementsJson    Json?
+  stripeAccountId     String?           @unique
+  dressmakerProfile   DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
+}
+
+model PortfolioItem {
+  id                  String               @id @default(cuid())
+  dressmakerId        String
+  title               String
+  attireType          AttireType           @default(OTHER)
+  tags                String[]
+  imageUrls           String[]
+  description         String?
+  isFeatured          Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  fileAssets          FileAsset[]
+  dressmaker          DressmakerProfile    @relation(fields: [dressmakerId], references: [id], onDelete: Cascade)
+  portfolioItemLabels PortfolioItemLabel[]
+
+  @@index([dressmakerId])
+}
+
+model Project {
+  id                     String                  @id @default(cuid())
+  projectCode            String                  @unique
+  status                 ProjectStatus           @default(REQUESTED)
+  customerId             String
+  dressmakerId           String
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  currency               String                  @default("USD")
+  quotedTotalAmount      Int?
+  depositPercent         Int?
+  title                  String?
+  conversations          Conversation?
+  fileAssets             FileAsset[]
+  milestones             Milestone[]
+  notifications          Notification[]
+  payment                Payment?
+  customer               User                    @relation("CustomerProjects", fields: [customerId], references: [id])
+  dressmaker             User                    @relation("DressmakerProjects", fields: [dressmakerId], references: [id])
+  details                ProjectDetails?
+  projectLabels          ProjectLabel[]
+  projectMeasurementGate ProjectMeasurementGate?
+  projectShipping        ProjectShipping?
+  review                 Review?
+  sketchSubmission       SketchSubmission?
+  supportTickets         SupportTicket[]
+
+  @@index([customerId])
+  @@index([dressmakerId])
+  @@index([status])
+}
+
+model ProjectDetails {
+  id                                  String    @id @default(cuid())
+  projectId                           String    @unique
+  eventDate                           DateTime?
+  shipByDate                          DateTime?
+  fabricNotes                         String?
+  referenceImages                     String[]
+  colorPreferences                    String?
+  sizeNotes                           String?
+  budgetCeiling                       Int?
+  createdAt                           DateTime  @default(now())
+  updatedAt                           DateTime  @updatedAt
+  fabricAgreed                        Boolean   @default(false)
+  fabricAgreedNote                    String?
+  requireSketch                       Boolean   @default(false)
+  sketchImage                         String[]
+  isRush                              Boolean   @default(false)
+  wantsCalico                         Boolean   @default(false)
+  cancelReason                        String?
+  canceledAt                          DateTime?
+  completedAt                         DateTime?
+  finalApprovedAt                     DateTime?
+  finalImages                         String[]
+  finalSubmittedAt                    DateTime?
+  fitSampleReceivedAt                 DateTime?
+  fitSampleSentAt                     DateTime?
+  measurementsConfirmedByCustomerAt   DateTime?
+  measurementsConfirmedByDressmakerAt DateTime?
+  measurementsRequested               String[]
+  shippedAt                           DateTime?
+  shippingCarrier                     String?
+  shippingTrackingNumber              String?
+  sketchApprovedAt                    DateTime?
+  sketchSubmittedAt                   DateTime?
+  project                             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Measurement {
+  id         String   @id @default(cuid())
+  customerId String
+  fieldsJson Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+model ProjectMeasurementGate {
+  id                    String    @id @default(cuid())
+  projectId             String    @unique
+  requestedFields       String[]
+  dressmakerConfirmedAt DateTime?
+  customerConfirmedAt   DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  project               Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id                String             @id @default(cuid())
+  customerId        String
+  dressmakerId      String
+  projectId         String?            @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  isGeneral         Boolean            @default(false)
+  customer          User               @relation("CustomerConversations", fields: [customerId], references: [id])
+  dressmaker        User               @relation("DressmakerConversations", fields: [dressmakerId], references: [id])
+  project           Project?           @relation(fields: [projectId], references: [id])
+  conversationReads ConversationRead[]
+  messages          Message[]
+
+  @@unique([customerId, dressmakerId, projectId])
+  @@index([customerId])
+  @@index([dressmakerId])
+  @@index([projectId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  text           String?
+  createdAt      DateTime     @default(now())
+  attachments    String[]
+  files          FileAsset[]
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model ConversationRead {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model Payment {
+  id                      String        @id @default(cuid())
+  projectId               String        @unique
+  totalAmount             Int
+  currency                String        @default("USD")
+  status                  PaymentStatus @default(REQUIRES_PAYMENT_METHOD)
+  stripePaymentIntentId   String?       @unique
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  stripeCheckoutSessionId String?
+  project                 Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Milestone {
+  id                      String          @id @default(cuid())
+  projectId               String
+  title                   String
+  amount                  Int
+  status                  MilestoneStatus @default(PENDING)
+  dueAt                   DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  paidAt                  DateTime?
+  payoutEligibleAt        DateTime?
+  releasedAt              DateTime?
+  stripeCheckoutSessionId String?         @unique
+  stripePaymentIntentId   String?         @unique
+  type                    MilestoneType
+  project                 Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  transfer                Transfer?
+
+  @@unique([projectId, type])
+  @@index([projectId])
+  @@index([status])
+  @@index([payoutEligibleAt])
+}
+
+model Transfer {
+  id               String         @id @default(cuid())
+  milestoneId      String         @unique
+  stripeTransferId String?        @unique
+  status           TransferStatus @default(PENDING)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  milestone        Milestone      @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id         String      @id @default(cuid())
+  projectId  String      @unique
+  rating     Int
+  text       String?
+  photoUrls  String[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  authorId   String
+  isVerified Boolean     @default(false)
+  fileAssets FileAsset[]
+  author     User        @relation("UserReviews", fields: [authorId], references: [id])
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model FileAsset {
+  id              String         @id @default(cuid())
+  url             String
+  mimeType        String?
+  fileName        String?
+  byteSize        Int?
+  purpose         FilePurpose
+  ownerId         String?
+  messageId       String?
+  projectId       String?
+  portfolioItemId String?
+  reviewId        String?
+  createdAt       DateTime       @default(now())
+  message         Message?       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  owner           User?          @relation(fields: [ownerId], references: [id])
+  portfolioItem   PortfolioItem? @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  review          Review?        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([projectId])
+  @@index([messageId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model SavedDressmaker {
+  id                  String            @id @default(cuid())
+  customerId          String
+  dressmakerProfileId String
+  createdAt           DateTime          @default(now())
+  customer            User              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  dressmakerProfile   DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, dressmakerProfileId])
+  @@index([customerId])
+  @@index([dressmakerProfileId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  projectId String?
+  project   Project?         @relation(fields: [projectId], references: [id])
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model SketchSubmission {
+  id            String    @id @default(cuid())
+  projectId     String    @unique
+  submittedById String
+  imageUrls     String[]
+  note          String?
+  approvedAt    DateTime?
+  approvedById  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  approvedBy    User?     @relation("SketchApprovedBy", fields: [approvedById], references: [id])
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submittedBy   User      @relation("SketchSubmittedBy", fields: [submittedById], references: [id])
+
+  @@index([submittedById])
+  @@index([approvedById])
+}
+
+model ProjectShipping {
+  id             String    @id @default(cuid())
+  projectId      String    @unique
+  carrier        String?
+  trackingNumber String?
+  shippedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Label {
+  id                    String                @id @default(cuid())
+  name                  String
+  status                LabelStatus           @default(PENDING)
+  createdById           String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  scope                 LabelScope
+  slug                  String
+  dressmakerSpecialties DressmakerSpecialty[]
+  createdBy             User?                 @relation(fields: [createdById], references: [id])
+  portfolioItemLabels   PortfolioItemLabel[]
+  projectLabels         ProjectLabel[]
+
+  @@unique([scope, slug])
+  @@index([scope, status])
+}
+
+model ProjectLabel {
+  id        String  @id @default(cuid())
+  projectId String
+  labelId   String
+  label     Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, labelId])
+  @@index([projectId])
+}
+
+model SupportTicket {
+  id             String          @id @default(cuid())
+  userId         String
+  projectId      String?
+  category       SupportCategory
+  subject        String
+  message        String
+  attachmentUrls String[]
+  status         SupportStatus   @default(OPEN)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  project        Project?        @relation(fields: [projectId], references: [id])
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AdminActionLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+  admin     User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([entity, entityId])
+  @@index([adminId, createdAt])
+}
+
+model PortfolioItemLabel {
+  id              String        @id @default(cuid())
+  portfolioItemId String
+  labelId         String
+  createdAt       DateTime      @default(now())
+  label           Label         @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  portfolioItem   PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioItemId, labelId])
+  @@index([labelId])
+  @@index([portfolioItemId])
+}
+
+model DressmakerSpecialty {
+  id                  String            @id @default(cuid())
+  dressmakerProfileId String
+  labelId             String
+  createdAt           DateTime          @default(now())
+  dressmakerProfile   DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
+  label               Label             @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([dressmakerProfileId, labelId])
+  @@index([labelId])
+}
+
+enum Role {
+  CUSTOMER
+  DRESSMAKER
+  ADMIN
+}
+
+enum ProjectStatus {
+  DRAFT
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  READY_TO_SHIP
+  SHIPPED
+  COMPLETED
+  CANCELED
+  FIT_SAMPLE_SENT
+}
+
+enum PaymentStatus {
+  REQUIRES_PAYMENT_METHOD
+  REQUIRES_CONFIRMATION
+  REQUIRES_ACTION
+  PROCESSING
+  SUCCEEDED
+  CANCELED
+  FAILED
+  REFUNDED
+}
+
+enum MilestoneStatus {
+  PENDING
+  INVOICED
+  PAID
+  RELEASED
+  CANCELED
+  REFUNDED
+}
+
+enum TransferStatus {
+  PENDING
+  PAID_OUT
+  FAILED
+  REVERSED
+}
+
+enum AttireType {
+  DRESS
+  SUIT
+  TOP
+  SKIRT
+  PANTS
+  OUTERWEAR
+  TRADITIONAL
+  OTHER
+  BRIDAL
+  EVENINGWEAR
+}
+
+enum DressmakerApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AccountStatus {
+  PENDING_EMAIL_VERIFICATION
+  ACTIVE
+  SUSPENDED
+}
+
+enum NotificationType {
+  QUOTE_REQUESTED
+  QUOTE_APPROVED
+  PAYMENT_SUCCEEDED
+  PROJECT_UPDATE
+  SUPPORT_TICKET_CREATED
+  PAYMENT_REFUNDED
+  DISPUTE_OPENED
+}
+
+enum LabelStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SupportCategory {
+  ACCOUNT_ROLE
+  PAYMENTS
+  DISPUTE
+  TECHNICAL
+  OTHER
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum MilestoneType {
+  DEPOSIT
+  FINAL
+}
+
+enum LabelScope {
+  PROJECT
+  PORTFOLIO
+  SPECIALTY
+}
+
+enum FilePurpose {
+  MESSAGE_ATTACHMENT
+  PROJECT_REFERENCE
+  PORTFOLIO_IMAGE
+  REVIEW_PHOTO
+}

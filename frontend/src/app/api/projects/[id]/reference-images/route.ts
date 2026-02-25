@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    include: { details: true },
+    include: { details: true, projectShipping: true },
   })
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 })
 

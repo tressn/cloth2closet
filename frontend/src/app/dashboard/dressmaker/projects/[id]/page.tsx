@@ -23,7 +23,16 @@ export default async function DressmakerProjectDetailPage({
 
   const project = await prisma.project.findUnique({
     where: { id },
-    include: { details: true, payment: true, conversations: true },
+    include: {
+      details: true,
+      payment: true,
+      conversations: true,
+      projectShipping: {
+        include: {
+          carrier: { select: { name: true } },
+        },
+      },
+    },
   });
 
   if (!project) notFound();

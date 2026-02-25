@@ -15,7 +15,7 @@ export default async function DressmakerProjectsPage() {
   const projects = await prisma.project.findMany({
     where: { dressmakerId: session.user.id },
     orderBy: { updatedAt: "desc" },
-    include: { details: true },
+    include: { details: true, projectShipping: true },
   });
 
   return (

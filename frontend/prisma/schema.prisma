@@ -117,6 +117,12 @@ enum MilestoneType {
   FINAL
 }
 
+enum LabelScope {
+  PROJECT
+  PORTFOLIO
+  SPECIALTY
+}
+
 //// CORE MODELS ////
 
 model User {
@@ -131,7 +137,6 @@ model User {
 
   role Role?
 
-  accounts Account[]
   sessions Session[]
 
   // Optional 1:1 profiles (only one will usually exist depending on role)
@@ -176,6 +181,7 @@ model User {
   sketchSubmissionsApproved SketchSubmission[] @relation("SketchApprovedBy")
   labels                    Label[]
   supportTickets            SupportTicket[]
+  adminActionLogs           AdminActionLog[]
 }
 
 model CustomerProfile {
@@ -185,15 +191,14 @@ model CustomerProfile {
   user User @relation("UserCustomerProfile", fields: [userId], references: [id], onDelete: Cascade)
 
   // Example starter fields (optional but common)
-  fullName   String?
-  phone      String?
-  timezone   String?
-  address1   String?
-  address2   String?
-  city       String?
-  region     String?
-  postalCode String?
-  country    String?
+  fullName        String?
+  phone           String?
+  timezoneIana    String?
+  address1        String?
+  address2        String?
+  postalCode      String?
+  countryCode     String? // "US", "CA", "GB", "FR"...
+  subdivisionCode String? // "NY", "ON", "ENG"...
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -208,16 +213,15 @@ model DressmakerProfile {
   // “detailed attributes”
   displayName     String?
   bio             String?
-  location        String? // e.g., "Brooklyn, NY"
+  timezoneIana    String?
+  countryCode     String? // "US", "CA", "GB", "FR"
   languages       String[] // Postgres array: ["en", "es"]
   basePriceFrom   Int? // store cents? or whole currency units (see note below)
   currency        String         @default("USD")
   yearsExperience Int?
-  specialties     String[] // e.g., ["bridal", "eveningwear"]
   websiteUrl      String?
   instagramHandle String?
   socialLinks     Json?
-  timezone        String?
   payoutProfile   PayoutProfile?
 
   // Portfolio items
@@ -225,6 +229,9 @@ model DressmakerProfile {
 
   // Saved dressmaker
   savedBy SavedDressmaker[]
+
+  //for better labeling
+  dressmakerSpecialties DressmakerSpecialty[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -258,13 +265,13 @@ model PayoutProfile {
   payoneerEmail String?
   payoneerId    String?
 
-  legalName  String?
-  country    String?
-  address1   String?
-  address2   String?
-  city       String?
-  region     String?
-  postalCode String?
+  legalName       String?
+  countryCode     String?
+  subdivisionCode String?
+  address1        String?
+  address2        String?
+  city            String?
+  postalCode      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -278,7 +285,6 @@ model PortfolioItem {
 
   title      String
   attireType AttireType @default(OTHER)
-  tags       String[] // ["silk", "bridal", "hand-stitched", "embroidery"]
   imageUrls  String[] // ["https://...","https://..."]
 
   // optional: extra metadata
@@ -289,6 +295,8 @@ model PortfolioItem {
   updatedAt DateTime @updatedAt
 
   fileAssets FileAsset[]
+
+  portfolioItemLabels PortfolioItemLabel[]
 
   @@index([dressmakerId])
 }
@@ -369,10 +377,6 @@ model ProjectDetails {
   finalImages      String[]
   finalSubmittedAt DateTime?
   finalApprovedAt  DateTime?
-
-  shippingCarrier        String?
-  shippingTrackingNumber String?
-  shippedAt              DateTime?
 
   completedAt  DateTime?
   canceledAt   DateTime?
@@ -605,26 +609,6 @@ model FileAsset {
   @@index([messageId])
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -709,7 +693,9 @@ model ProjectShipping {
   projectId String  @unique
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  carrier        String?
+  carrier        ShippingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  carrierId      String?
+  carrierOther   String?
   trackingNumber String?
   shippedAt      DateTime?
 
@@ -717,17 +703,59 @@ model ProjectShipping {
   updatedAt DateTime @updatedAt
 }
 
-// labels status to set label standards
-model Label {
-  id          String      @id @default(cuid())
-  name        String      @unique
-  status      LabelStatus @default(PENDING)
-  createdById String?
-  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+model PortfolioItemLabel {
+  id              String @id @default(cuid())
+  portfolioItemId String
+  labelId         String
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  projectLabels ProjectLabel[]
+  portfolioItem PortfolioItem @relation(fields: [portfolioItemId], references: [id], onDelete: Cascade)
+  label         Label         @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([portfolioItemId, labelId])
+  @@index([labelId])
+  @@index([portfolioItemId])
+}
+
+model DressmakerSpecialty {
+  id                  String @id @default(cuid())
+  dressmakerProfileId String
+  labelId             String
+
+  dressmakerProfile DressmakerProfile @relation(fields: [dressmakerProfileId], references: [id], onDelete: Cascade)
+  label             Label             @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([dressmakerProfileId, labelId])
+  @@index([labelId])
+  @@index([dressmakerProfileId])
+}
+
+model Label {
+  id String @id @default(cuid())
+
+  // display text
+  name String
+
+  // normalized key for uniqueness
+  slug   String
+  scope  LabelScope  @default(PROJECT)
+  status LabelStatus @default(PENDING)
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectLabels         ProjectLabel[]
+  portfolioItemLabels   PortfolioItemLabel[]
+  dressmakerSpecialties DressmakerSpecialty[]
+
+  @@unique([scope, slug])
+  @@index([scope, status])
 }
 
 model ProjectLabel {
@@ -778,4 +806,15 @@ model AdminActionLog {
 
   @@index([entity, entityId])
   @@index([adminId, createdAt])
+}
+
+model ShippingCarrier {
+  id        String  @id @default(cuid())
+  name      String  @unique // "UPS", "USPS", "DHL"
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  projectShippings ProjectShipping[]
 }

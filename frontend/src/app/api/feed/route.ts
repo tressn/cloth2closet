@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { COUNTRIES } from "@/lib/lookup/countries";
+
+const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
 export async function GET() {
   const [portfolio, reviews] = await Promise.all([
@@ -22,13 +25,14 @@ export async function GET() {
           select: {
             id: true,
             displayName: true,
-            location: true,
+            countryCode: true, // ✅ was location
             basePriceFrom: true,
             currency: true,
           },
         },
       },
     }),
+
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
       take: 25,
@@ -42,7 +46,12 @@ export async function GET() {
           select: {
             dressmaker: {
               select: {
-                dressmakerProfile: { select: { displayName: true, location: true } },
+                dressmakerProfile: {
+                  select: {
+                    displayName: true,
+                    countryCode: true, // ✅ was location
+                  },
+                },
               },
             },
           },
@@ -51,48 +60,60 @@ export async function GET() {
     }),
   ]);
 
-  // Normalize to your UI’s expected shape
-  const uploads = portfolio.map((p) => ({
-    type: "upload" as const,
-    id: `u_${p.id}`,
-    maker: p.dressmaker.displayName ?? "Dressmaker",
-    location: p.dressmaker.location ?? "—",
-    title: p.title,
-    price:
-      typeof p.dressmaker.basePriceFrom === "number"
-        ? `From ${formatMoney(p.dressmaker.basePriceFrom, p.dressmaker.currency)}`
-        : "—",
-    imageUrl: p.imageUrls?.[0] ?? undefined,
-    featured: p.isFeatured,
-    dressmakerProfileId: p.dressmaker.id,
-  }));
+  const uploads = portfolio.map((p) => {
+    const code = p.dressmaker.countryCode ?? null;
+    return {
+      type: "upload" as const,
+      id: `u_${p.id}`,
+      maker: p.dressmaker.displayName ?? "Dressmaker",
+
+      // ✅ keep both
+      countryCode: code,
+      countryLabel: code ? COUNTRY_LABEL_BY_CODE.get(code) ?? code : "—",
+
+      title: p.title,
+      price:
+        typeof p.dressmaker.basePriceFrom === "number"
+          ? `From ${formatMoney(p.dressmaker.basePriceFrom, p.dressmaker.currency)}`
+          : "—",
+      imageUrl: p.imageUrls?.[0] ?? undefined,
+      featured: p.isFeatured,
+      dressmakerProfileId: p.dressmaker.id,
+      createdAt: p.createdAt,
+    };
+  });
 
   const reviewItems = reviews
-    .filter((r) => r.text && r.text.trim().length > 0) // avoid empty reviews in feed
+    .filter((r) => r.text && r.text.trim().length > 0)
     .map((r) => {
       const dm = r.project.dressmaker.dressmakerProfile;
+      const code = dm?.countryCode ?? null;
+
       return {
         type: "review" as const,
         id: `r_${r.id}`,
         rating: r.rating,
         quote: r.text!,
         reviewer: r.author.name ?? "Customer",
-        region: dm?.location ?? "—",
+
+        // ✅ keep both
+        countryCode: code,
+        countryLabel: code ? COUNTRY_LABEL_BY_CODE.get(code) ?? code : "—",
+
         itemTitle: dm?.displayName ?? "Dressmaker",
+        createdAt: r.createdAt,
       };
     });
 
+  // If you want the feed truly chronological across uploads + reviews:
   const items = [...uploads, ...reviewItems]
-    // if you want strict ordering by date, include createdAt in objects and sort.
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 30);
 
   return Response.json({ items });
 }
 
 function formatMoney(amount: number, currency: string) {
-  // basePriceFrom is Int? in your schema. If you store cents, use /100.
-  // Right now you commented “store cents? or whole currency units”.
-  // I’ll assume cents for consistency with your Payment/Milestone amounts.
   const cents = amount;
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(cents / 100);

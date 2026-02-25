@@ -9,6 +9,9 @@ import MessageButton from "./MessageButton";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import SaveDressmakerButton from "./SaveDressmakerButton";
+import { COUNTRIES } from "@/lib/lookup/countries";
+
+const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
 export default async function DressmakerPublicPage({
   params,
@@ -20,7 +23,19 @@ export default async function DressmakerPublicPage({
 
   const dressmaker = await prisma.dressmakerProfile.findUnique({
     where: { id },
-    include: { portfolioItems: { orderBy: { createdAt: "desc" } } },
+    include: {
+      dressmakerSpecialties: {
+        include: { label: true },
+      },
+      portfolioItems: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          portfolioItemLabels: {
+            include: { label: true },
+          },
+        },
+      },
+    },
   });
 
   const session = await getServerSession(authOptions);
@@ -50,7 +65,11 @@ export default async function DressmakerPublicPage({
               <Card>
                 <CardHeader
                   title={dressmaker.displayName ?? "Dressmaker"}
-                  subtitle={dressmaker.location ? `📍 ${dressmaker.location}` : "📍 Location not listed"}
+                  subtitle={
+                    dressmaker.countryCode
+                      ? `📍 ${COUNTRY_LABEL_BY_CODE.get(dressmaker.countryCode) ?? dressmaker.countryCode}`
+                      : "📍 Country not listed"
+                  }
                   right={
                     <div className="flex items-center gap-2">
                       {dressmaker.yearsExperience != null ? (
@@ -73,9 +92,21 @@ export default async function DressmakerPublicPage({
                       <Badge tone="neutral">🗣️ {dressmaker.languages.slice(0, 3).join(", ")}{dressmaker.languages.length > 3 ? "…" : ""}</Badge>
                     ) : null}
 
-                    {dressmaker.specialties?.length ? (
-                      <Badge tone="neutral">✨ {dressmaker.specialties.slice(0, 2).join(" • ")}{dressmaker.specialties.length > 2 ? "…" : ""}</Badge>
-                    ) : null}
+                    {dressmaker.dressmakerSpecialties?.length ? (
+                      <Badge tone="neutral">
+                        ✨{" "}
+                        {dressmaker.dressmakerSpecialties
+                          .map((x) => x.label)
+                          .filter((l) => l.scope === "SPECIALTY" && l.status !== "REJECTED")
+                          .map((l) => l.name)
+                          .slice(0, 2)
+                          .join(" • ")}
+                        {dressmaker.dressmakerSpecialties.filter((x) => x.label.scope === "SPECIALTY" && x.label.status !== "REJECTED").length >
+                        2
+                          ? "…"
+                          : ""}
+                      </Badge>
+) : null}
                   </div>
 
                   {dressmaker.bio ? (
@@ -149,16 +180,20 @@ export default async function DressmakerPublicPage({
                           </div>
                           <div className="p-4">
                             <div className="text-[14px] font-semibold text-[var(--text)]">{item.title}</div>
-                            {item.tags?.length ? (
+                            {item.portfolioItemLabels?.length ? (
                               <div className="mt-2 flex flex-wrap gap-2">
-                                {item.tags.slice(0, 3).map((t) => (
-                                  <span
-                                    key={t}
-                                    className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--muted)]"
-                                  >
-                                    {t}
-                                  </span>
-                                ))}
+                                {item.portfolioItemLabels
+                                  .map((x) => x.label)
+                                  .filter((l) => l.scope === "PORTFOLIO" && l.status !== "REJECTED")
+                                  .slice(0, 3)
+                                  .map((l) => (
+                                    <span
+                                      key={l.id}
+                                      className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--muted)]"
+                                    >
+                                      {l.name}
+                                    </span>
+                                  ))}
                               </div>
                             ) : null}
                           </div>

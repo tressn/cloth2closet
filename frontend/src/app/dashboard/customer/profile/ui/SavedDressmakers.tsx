@@ -1,4 +1,7 @@
 import { Avatar } from "@/components/ui/Avatar";
+import { COUNTRIES } from "@/lib/lookup/countries";
+
+const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
 type Item = {
   id: string;
@@ -6,7 +9,7 @@ type Item = {
   dressmakerProfile: {
     id: string;
     displayName: string | null;
-    location: string | null;
+    countryCode: string | null; // ✅ was location
     user: { id: string; name: string | null; username: string | null; image: string | null };
   };
 };
@@ -34,10 +37,11 @@ export default function SavedDressmakers({ items }: { items: Item[] }) {
               u.username ??
               "Dressmaker";
 
-            const subtitle =
-              s.dressmakerProfile.location ??
-              u.username ??
-              undefined;
+            const countryLabel = s.dressmakerProfile.countryCode
+              ? COUNTRY_LABEL_BY_CODE.get(s.dressmakerProfile.countryCode) ?? s.dressmakerProfile.countryCode
+              : undefined;
+
+            const subtitle = countryLabel ?? u.username ?? undefined;
 
             return (
               <a
@@ -45,22 +49,12 @@ export default function SavedDressmakers({ items }: { items: Item[] }) {
                 href={`/dressmakers/${s.dressmakerProfile.id}`}
                 className="flex items-center gap-3 rounded-xl border p-3 hover:opacity-90"
               >
-                <Avatar
-                  name={
-                    s.dressmakerProfile.displayName ??
-                    u.name ??
-                    u.username ??
-                    "Dressmaker"
-                  }
-                  subtitle={s.dressmakerProfile.location ?? u.username ?? undefined}
-                />
+                <Avatar name={displayName} subtitle={subtitle} />
 
                 <div className="min-w-0">
                   <div className="font-medium truncate">{displayName}</div>
-                  {s.dressmakerProfile.location ? (
-                    <div className="text-sm opacity-70 truncate">
-                      {s.dressmakerProfile.location}
-                    </div>
+                  {countryLabel ? (
+                    <div className="text-sm opacity-70 truncate">{countryLabel}</div>
                   ) : null}
                 </div>
               </a>
@@ -70,8 +64,8 @@ export default function SavedDressmakers({ items }: { items: Item[] }) {
       )}
 
       <p className="mt-4 text-xs opacity-60">
-        Tip: Add a “Save” button on the dressmaker page that calls
-        {" "}<code>/api/customer/saved-dressmakers</code>.
+        Tip: Add a “Save” button on the dressmaker page that calls{" "}
+        <code>/api/customer/saved-dressmakers</code>.
       </p>
     </div>
   );

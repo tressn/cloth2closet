@@ -23,6 +23,15 @@ type Project = {
   title: string | null;
   status: ProjectStatus;
   payment?: { status: string | null } | null;
+
+  // ✅ belongs on Project (top-level)
+  projectShipping?: {
+    carrier: { name: string } | null; // matches your schema relation carrier: ShippingCarrier?
+    carrierOther: string | null;
+    trackingNumber: string | null;
+    shippedAt: string | Date | null;
+  } | null;
+
   details?: {
     requireSketch: boolean;
     sketchImage: string[];
@@ -42,10 +51,6 @@ type Project = {
     finalImages: string[];
     finalSubmittedAt: string | Date | null;
     finalApprovedAt: string | Date | null;
-
-    shippingCarrier: string | null;
-    shippingTrackingNumber: string | null;
-    shippedAt: string | Date | null;
 
     completedAt: string | Date | null;
     canceledAt: string | Date | null;
@@ -251,8 +256,8 @@ export default function ProjectProgress({ project, viewerRole }: { project: Proj
             <div className="text-[14px] text-[var(--text)]">{s.done ? "✅ " : "• "} {s.label}</div>
             <div className="text-[12px] text-[var(--muted)]">
               {s.key === "SKETCH" && d?.sketchApprovedAt ? `Approved ${fmtDate(d.sketchApprovedAt)}` : null}
-              {s.key === "SHIPPED" && d?.shippingTrackingNumber
-                ? `${d.shippingCarrier ?? "Carrier"} ${d.shippingTrackingNumber}`
+              {s.key === "SHIPPED" && project.projectShipping?.trackingNumber
+                ? `${project.projectShipping?.carrier ?? "Carrier"} ${project.projectShipping?.trackingNumber}`
                 : null}
             </div>
           </div>

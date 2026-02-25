@@ -46,6 +46,7 @@ export default async function AdminPayoutsPage() {
         { label: "Payouts", href: "/dashboard/admin/payouts" },
         { label: "Support", href: "/dashboard/admin/support" },
         { label: "Users", href: "/dashboard/admin/users" },
+        { label: "Labels", href: "/dashboard/admin/labels" },
       ]}
     >
       <div className="max-w-6xl">

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { COUNTRY_SET } from "@/lib/lookup/countries"; // adjust path if needed
 
 function isEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -34,16 +35,24 @@ export async function POST(req: Request) {
       }
     }
 
+    // ✅ Country (ISO alpha-2) for both roles
+    const countryCode = (body.countryCode ?? "").toUpperCase().trim();
+    if (countryCode && !COUNTRY_SET.has(countryCode)) {
+      return NextResponse.json({ error: "Invalid country." }, { status: 400 });
+    }
+
     // Dressmaker required fields
     const displayName = (body.displayName ?? "").trim();
-    const location = (body.location ?? "").trim();
-    const minimumBudget = body.minimumBudget; // number in dollars (UI) -> convert to cents
+    const minimumBudget = body.minimumBudget; // dollars (UI)
     const instagram = (body.instagram ?? "").trim();
     const tiktok = (body.tiktok ?? "").trim();
 
     if (role === "DRESSMAKER") {
       if (!displayName) return NextResponse.json({ error: "Display name is required." }, { status: 400 });
-      if (!location) return NextResponse.json({ error: "Location is required." }, { status: 400 });
+
+      // ✅ Require country for dressmakers (optional for customers)
+      if (!countryCode) return NextResponse.json({ error: "Country is required." }, { status: 400 });
+
       if (typeof minimumBudget !== "number" || minimumBudget <= 0) {
         return NextResponse.json({ error: "Minimum budget must be a positive number." }, { status: 400 });
       }
@@ -63,7 +72,6 @@ export async function POST(req: Request) {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create user + profile
     if (role === "CUSTOMER") {
       await prisma.user.create({
         data: {
@@ -71,10 +79,17 @@ export async function POST(req: Request) {
           username,
           passwordHash,
           role: "CUSTOMER",
-          customerProfile: { create: { fullName: null } },
+          customerProfile: {
+            create: {
+              fullName: null,
+              countryCode: countryCode || null,
+            },
+          },
         },
       });
     } else {
+      const basePriceFrom = Math.round(minimumBudget * 100); // cents
+
       await prisma.user.create({
         data: {
           email,
@@ -84,8 +99,9 @@ export async function POST(req: Request) {
           dressmakerProfile: {
             create: {
               displayName,
-              location,
-              minimumBudgetCents: Math.round(minimumBudget * 100),
+              countryCode, // ✅ stored here
+              basePriceFrom, // ✅ store validated budget
+              currency: "USD",
               socialLinks: { instagram: instagram || null, tiktok: tiktok || null },
               approvalStatus: "PENDING",
               isPublished: false,

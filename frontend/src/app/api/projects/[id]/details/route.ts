@@ -8,7 +8,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!session?.user?.id) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
   const { id } = await params
-  const project = await prisma.project.findUnique({ where: { id }, include: { details: true } })
+  const project = await prisma.project.findUnique({ where: { id }, include: { details: true, projectShipping: true } })
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 })
 
   const userId = session.user.id

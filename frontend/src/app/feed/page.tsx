@@ -4,13 +4,17 @@ import { Container } from "@/components/ui/Container";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import SaveDressmakerButton from "@/components/dressmakers/SaveDressmakerButton";
+import { COUNTRIES } from "@/lib/lookup/countries";
+
+const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
 type FeedItem =
   | {
       type: "upload";
       id: string;
       maker: string;
-      location: string;
+      countryCode: string | null;
+      countryLabel: string;
       title: string;
       price: string;
       imageUrl?: string;
@@ -23,7 +27,8 @@ type FeedItem =
       rating: number;
       quote: string;
       reviewer: string;
-      region: string;
+      countryCode: string | null;
+      countryLabel: string;
       itemTitle: string;
     };
 
@@ -33,7 +38,7 @@ function Stars({ rating }: { rating: number }) {
 }
 
 function formatMoneyWhole(amount: number, currency: string) {
-  // You said: whole units (no cents)
+  // whole units
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
   } catch {
@@ -42,7 +47,24 @@ function formatMoneyWhole(amount: number, currency: string) {
 }
 
 export default async function FeedPage() {
-  // 1) Portfolio
+  // ---- Portfolio select typed with `as const` so TS knows `dressmaker` exists
+  const portfolioSelect = {
+    id: true,
+    title: true,
+    imageUrls: true,
+    isFeatured: true,
+    createdAt: true,
+    dressmaker: {
+      select: {
+        id: true,
+        displayName: true,
+        countryCode: true, // ✅ was location
+        basePriceFrom: true,
+        currency: true,
+      },
+    },
+  } as const;
+
   const portfolio = await prisma.portfolioItem.findMany({
     where: {
       dressmaker: {
@@ -53,77 +75,78 @@ export default async function FeedPage() {
     },
     orderBy: { createdAt: "desc" },
     take: 25,
-    select: {
-      id: true,
-      title: true,
-      imageUrls: true,
-      isFeatured: true,
-      createdAt: true,
-      dressmaker: {
-        select: {
-          id: true,
-          displayName: true,
-          location: true,
-          basePriceFrom: true, // whole units
-          currency: true,
-        },
-      },
-    },
+    select: portfolioSelect,
   });
 
-  // 2) Reviews
-  const reviews = await prisma.review.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 25,
-    select: {
-      id: true,
-      rating: true,
-      text: true,
-      createdAt: true,
-      author: { select: { name: true } },
-      project: {
-        select: {
-          dressmaker: {
-            select: {
-              dressmakerProfile: { select: { displayName: true, location: true } },
+  // ---- Reviews select typed with `as const` so TS knows `author` + `project` exist
+  const reviewSelect = {
+    id: true,
+    rating: true,
+    text: true,
+    createdAt: true,
+    author: { select: { name: true } },
+    project: {
+      select: {
+        dressmaker: {
+          select: {
+            dressmakerProfile: {
+              select: {
+                displayName: true,
+                countryCode: true, // ✅ was location
+              },
             },
           },
         },
       },
     },
+  } as const;
+
+  const reviews = await prisma.review.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 25,
+    select: reviewSelect,
   });
 
-  const uploads: FeedItem[] = portfolio.map((p) => ({
-    type: "upload",
-    id: `u_${p.id}`,
-    maker: p.dressmaker.displayName ?? "Dressmaker",
-    location: p.dressmaker.location ?? "—",
-    title: p.title,
-    price:
-      typeof p.dressmaker.basePriceFrom === "number"
-        ? `From ${formatMoneyWhole(p.dressmaker.basePriceFrom, p.dressmaker.currency)}`
-        : "—",
-    imageUrl: p.imageUrls?.[0] ?? undefined,
-    featured: p.isFeatured,
-    dressmakerProfileId: p.dressmaker.id,
-  }));
+  const uploads: FeedItem[] = portfolio.map((p) => {
+    const code = p.dressmaker.countryCode ?? null;
+    const label = code ? COUNTRY_LABEL_BY_CODE.get(code) ?? code : "—";
+
+    return {
+      type: "upload",
+      id: `u_${p.id}`,
+      maker: p.dressmaker.displayName ?? "Dressmaker",
+      countryCode: code,
+      countryLabel: label,
+      title: p.title,
+      price:
+        typeof p.dressmaker.basePriceFrom === "number"
+          ? `From ${formatMoneyWhole(p.dressmaker.basePriceFrom, p.dressmaker.currency)}`
+          : "—",
+      imageUrl: p.imageUrls?.[0] ?? undefined,
+      featured: p.isFeatured,
+      dressmakerProfileId: p.dressmaker.id,
+    };
+  });
 
   const reviewItems: FeedItem[] = reviews
     .filter((r) => r.text && r.text.trim().length > 0)
     .map((r) => {
       const dm = r.project.dressmaker.dressmakerProfile;
+      const code = dm?.countryCode ?? null;
+      const label = code ? COUNTRY_LABEL_BY_CODE.get(code) ?? code : "—";
+
       return {
         type: "review",
         id: `r_${r.id}`,
         rating: r.rating,
         quote: r.text!,
         reviewer: r.author.name ?? "Customer",
-        region: dm?.location ?? "—",
+        countryCode: code,
+        countryLabel: label,
         itemTitle: dm?.displayName ?? "Dressmaker",
       };
     });
 
-  // Optional: mix by newest (simple approach: just interleave)
   const FEED: FeedItem[] = [...uploads, ...reviewItems].slice(0, 30);
 
   return (
@@ -131,7 +154,9 @@ export default async function FeedPage() {
       <header className="border-b border-[var(--border)] bg-[var(--surface)]">
         <Container>
           <div className="py-10">
-            <div className="text-[var(--text-2xl)] font-semibold leading-[var(--lh-2xl)] text-[var(--text)]">New activity</div>
+            <div className="text-[var(--text-2xl)] font-semibold leading-[var(--lh-2xl)] text-[var(--text)]">
+              New activity
+            </div>
             <div className="mt-2 text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
               Fresh uploads from dressmakers + recent reviews
             </div>
@@ -149,7 +174,7 @@ export default async function FeedPage() {
                     <div className="flex items-center justify-between px-6 py-5">
                       <div>
                         <div className="text-[15px] font-semibold text-[var(--text)]">{item.maker}</div>
-                        <div className="mt-1 text-[13px] text-[var(--muted)]">{item.location} · New upload</div>
+                        <div className="mt-1 text-[13px] text-[var(--muted)]">{item.countryLabel} · New upload</div>
                       </div>
                       {item.featured ? <Badge tone="featured">Featured</Badge> : null}
                     </div>
@@ -179,10 +204,7 @@ export default async function FeedPage() {
                         >
                           View details
                         </Link>
-                        <SaveDressmakerButton
-                          dressmakerProfileId={item.dressmakerProfileId}
-                          initialSaved={false}
-                        />
+                        <SaveDressmakerButton dressmakerProfileId={item.dressmakerProfileId} initialSaved={false} />
                       </div>
                     </CardBody>
                   </Card>
@@ -202,8 +224,8 @@ export default async function FeedPage() {
                     </div>
 
                     <div className="mt-4 text-[14px] leading-6 text-[var(--muted)]">
-                      <span className="font-semibold text-[var(--text)]">{item.reviewer}</span> in {item.region} · reviewing{" "}
-                      <span className="font-semibold text-[var(--text)]">{item.itemTitle}</span>
+                      <span className="font-semibold text-[var(--text)]">{item.reviewer}</span> in {item.countryLabel} ·
+                      reviewing <span className="font-semibold text-[var(--text)]">{item.itemTitle}</span>
                     </div>
                   </CardBody>
                 </Card>

@@ -19,7 +19,12 @@ export default async function EditPortfolioItemPage({ params }: { params: Promis
   });
   if (!profile) notFound();
 
-  const item = await prisma.portfolioItem.findUnique({ where: { id } });
+  const item = await prisma.portfolioItem.findUnique({
+    where: { id },
+    include: {
+      portfolioItemLabels: { include: { label: true } },
+    },
+  });
   if (!item || item.dressmakerId !== profile.id) notFound();
 
   return (

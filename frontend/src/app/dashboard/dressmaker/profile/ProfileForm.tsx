@@ -1,19 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 
+type Opt = { value: string; label: string };
+
 type Profile = {
   displayName: string | null;
   bio: string | null;
-  location: string | null;
-  languages: string[];
-  basePriceFrom: number | null; // cents
+
+  countryCode: string | null;
+  timezoneIana: string | null;
+
+  languageCodes: string[];
+
+  basePriceFrom: number | null;
   currency: string;
   yearsExperience: number | null;
+
   specialties: string[];
   websiteUrl: string | null;
   instagramHandle: string | null;
@@ -24,8 +31,7 @@ const CURRENCIES = ["USD", "CAD", "EUR", "GBP"] as const;
 export default function ProfileForm({ initialProfile }: { initialProfile: Profile }) {
   const [displayName, setDisplayName] = useState(initialProfile.displayName ?? "");
   const [bio, setBio] = useState(initialProfile.bio ?? "");
-  const [location, setLocation] = useState(initialProfile.location ?? "");
-  const [languagesText, setLanguagesText] = useState((initialProfile.languages ?? []).join(", "));
+
   const [specialtiesText, setSpecialtiesText] = useState((initialProfile.specialties ?? []).join(", "));
 
   const [basePriceFrom, setBasePriceFrom] = useState(
@@ -39,6 +45,15 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
   const [websiteUrl, setWebsiteUrl] = useState(initialProfile.websiteUrl ?? "");
   const [instagramHandle, setInstagramHandle] = useState(initialProfile.instagramHandle ?? "");
 
+  const [countryCode, setCountryCode] = useState(initialProfile.countryCode ?? "");
+  const [timezoneIana, setTimezoneIana] = useState(initialProfile.timezoneIana ?? "");
+
+  const [languageCodes, setLanguageCodes] = useState<string[]>(initialProfile.languageCodes ?? []);
+
+  const [countries, setCountries] = useState<Opt[]>([]);
+  const [timezones, setTimezones] = useState<Opt[]>([]);
+  const [languages, setLanguages] = useState<Opt[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -48,13 +63,37 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
     return (n / 100).toFixed(2);
   }, [basePriceFrom]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const [c, t, l] = await Promise.all([
+          fetch("/api/lookups/countries").then((r) => r.json()),
+          fetch("/api/lookups/timezones").then((r) => r.json()),
+          fetch("/api/lookups/languages").then((r) => r.json()),
+        ]);
+        setCountries(Array.isArray(c) ? c : []);
+        setTimezones(Array.isArray(t) ? t : []);
+        setLanguages(Array.isArray(l) ? l : []);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  function toggleLanguage(code: string) {
+    setLanguageCodes((prev) => {
+      const set = new Set(prev);
+      if (set.has(code)) set.delete(code);
+      else set.add(code);
+      return Array.from(set);
+    });
+  }
+
   async function onSave() {
     setSaving(true);
     setMessage(null);
 
-    const languages = languagesText.split(",").map((s) => s.trim()).filter(Boolean);
     const specialties = specialtiesText.split(",").map((s) => s.trim()).filter(Boolean);
-
     const parsedBasePrice = basePriceFrom.trim().length ? Number(basePriceFrom) : null;
     const parsedYears = yearsExperience.trim().length ? Number(yearsExperience) : null;
 
@@ -64,14 +103,17 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
       body: JSON.stringify({
         displayName,
         bio,
-        location,
-        languages,
+
+        countryCode: countryCode || null,
+        timezoneIana: timezoneIana || null,
+        languageCodes,
+
         basePriceFrom: parsedBasePrice,
         currency,
         yearsExperience: parsedYears,
         specialties,
         websiteUrl: websiteUrl.trim() || null,
-        instagramHandle: instagramHandle.trim() || null,
+        instagramHandle: instagramHandle.trim().replace(/^@/, "") || null,
       }),
     });
 
@@ -92,27 +134,55 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
           <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. Lina’s Atelier" />
         </Field>
 
-        <Field label="Location" hint="City + country works well for trust.">
-          <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder='e.g. "Brooklyn, NY"' />
+        <Field label="Country">
+          <Select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
+            <option value="">Select country</option>
+            {countries.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </Select>
         </Field>
       </div>
-
-      <Field label="Bio" hint="Describe your style, turnaround time, and what you love making.">
-        <Textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Your specialties, style, turnaround time…" />
-      </Field>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Languages" hint="Comma-separated (en, fr, es) or full words — be consistent.">
-          <Input value={languagesText} onChange={(e) => setLanguagesText(e.target.value)} placeholder="en, fr" />
-        </Field>
-
-        <Field label="Specialties" hint="Comma-separated tags that buyers search for.">
-          <Input value={specialtiesText} onChange={(e) => setSpecialtiesText(e.target.value)} placeholder="bridal, eveningwear, alterations" />
+        <Field label="Timezone" hint="Shown for availability / scheduling.">
+          <Select value={timezoneIana} onChange={(e) => setTimezoneIana(e.target.value)}>
+            <option value="">Select timezone</option>
+            {timezones.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </Select>
         </Field>
       </div>
 
+      <Field label="Bio">
+        <Textarea value={bio} onChange={(e) => setBio(e.target.value)} />
+      </Field>
+
+      <Field label="Languages" hint="Select the languages you can comfortably communicate in.">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {languages.map((l) => {
+            const checked = languageCodes.includes(l.value);
+            return (
+              <label key={l.value} className="flex items-center gap-2 text-[13px]">
+                <input type="checkbox" checked={checked} onChange={() => toggleLanguage(l.value)} />
+                <span>{l.label}</span>
+              </label>
+            );
+          })}
+          {languages.length === 0 ? <div className="text-[13px] opacity-70">No languages available.</div> : null}
+        </div>
+      </Field>
+
+      <Field label="Specialties" hint="Comma-separated (e.g. bridal, eveningwear).">
+        <Input value={specialtiesText} onChange={(e) => setSpecialtiesText(e.target.value)} />
+      </Field>
+
       <div className="grid gap-4 md:grid-cols-3">
-        <Field label="Base price from (cents)" hint={previewPrice ? `Preview: ${currency} ${previewPrice}` : "Stored in cents (e.g. 50000 = $500.00)."}>
+        <Field
+          label="Base price from (cents)"
+          hint={previewPrice ? `Preview: ${currency} ${previewPrice}` : "Stored in cents (e.g. 50000 = $500.00)."}
+        >
           <Input value={basePriceFrom} onChange={(e) => setBasePriceFrom(e.target.value)} placeholder="50000" />
         </Field>
 
@@ -121,7 +191,6 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
             {CURRENCIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
-            {!CURRENCIES.includes(currency as any) ? <option value={currency}>{currency}</option> : null}
           </Select>
         </Field>
 
@@ -131,27 +200,21 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Website URL" hint="Optional. Adds trust.">
-          <Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://your-site.com" />
+        <Field label="Website URL">
+          <Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
         </Field>
 
-        <Field label="Instagram handle" hint="Optional. No @ needed.">
-          <Input value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} placeholder="yourhandle" />
+        <Field label="Instagram handle" hint="No @ needed.">
+          <Input value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} />
         </Field>
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[13px] text-[var(--muted)]">
-          Keep your profile warm + clear. Luxury comes from clarity and restraint.
-        </div>
         <Button type="button" onClick={onSave} disabled={saving} variant="primary">
           {saving ? "Saving..." : "Save changes"}
         </Button>
+        {message ? <div className="text-[13px] opacity-70">{message}</div> : null}
       </div>
-
-      {message ? (
-        <div className="text-[13px] text-[var(--muted)]">{message}</div>
-      ) : null}
     </div>
   );
 }
@@ -167,9 +230,9 @@ function Field({
 }) {
   return (
     <label className="grid gap-2">
-      <div className="text-[12px] font-medium text-[var(--muted)]">{label}</div>
+      <div className="text-[12px] font-medium opacity-70">{label}</div>
       {children}
-      {hint ? <div className="text-[12px] leading-5 text-[var(--muted)]">{hint}</div> : null}
+      {hint ? <div className="text-[12px] leading-5 opacity-70">{hint}</div> : null}
     </label>
   );
 }

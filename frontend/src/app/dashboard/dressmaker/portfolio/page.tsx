@@ -28,11 +28,15 @@ export default async function DressmakerPortfolioPage() {
       id: true,
       title: true,
       attireType: true,
-      tags: true,
       imageUrls: true,
       description: true,
       isFeatured: true,
       createdAt: true,
+      portfolioItemLabels: {
+        select: {
+          label: { select: { name: true, scope: true, status: true } },
+        },
+      },
     },
   });
 
@@ -74,47 +78,75 @@ export default async function DressmakerPortfolioPage() {
                 <div className="text-[14px] text-[var(--muted)]">Add your first item above.</div>
               ) : (
                 <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                  {items.map((item) => (
-                    <article
-                      key={item.id}
-                      className="overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]"
-                    >
-                      <div className="aspect-[1/1] bg-[var(--surface-2)]">
-                        {item.imageUrls?.[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.imageUrls[0]}
-                            alt={item.title}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-[12px] text-[var(--muted)]">
-                            No image
+                  {items.map((item) => {
+                    const tags =
+                      item.portfolioItemLabels
+                        ?.map((x) => x.label)
+                        .filter((l) => l.scope === "PORTFOLIO" && l.status !== "REJECTED")
+                        .map((l) => l.name) ?? [];
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]"
+                      >
+                        <div className="aspect-[1/1] bg-[var(--surface-2)]">
+                          {item.imageUrls?.[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.imageUrls[0]} alt={item.title} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-[12px] text-[var(--muted)]">
+                              No image
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-3">
+                          <div className="truncate text-[13px] font-semibold text-[var(--text)]">{item.title}</div>
+
+                          <div className="mt-1 truncate text-[12px] text-[var(--muted)]">
+                            {item.attireType}
+                            {tags.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {tags.slice(0, 3).map((t) => (
+                                  <span
+                                    key={t}
+                                    className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--muted)]"
+                                  >
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            {item.isFeatured ? " • Featured" : ""}
                           </div>
-                        )}
-                      </div>
 
-                      <div className="p-3">
-                        <div className="truncate text-[13px] font-semibold text-[var(--text)]">
-                          {item.title}
-                        </div>
-                        <div className="mt-1 truncate text-[12px] text-[var(--muted)]">
-                          {item.attireType}
-                          {item.isFeatured ? " • Featured" : ""}
-                        </div>
+                          {tags.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {tags.slice(0, 3).map((t) => (
+                                <span
+                                  key={t}
+                                  className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--muted)]"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
 
-                        <div className="mt-3 flex items-center justify-between">
-                          <Link
-                            className="text-[12px] font-medium underline text-[var(--plum-600)]"
-                            href={`/dashboard/dressmaker/portfolio/${item.id}/edit`}
-                          >
-                            Edit
-                          </Link>
-                          <DeleteButton id={item.id} />
+                          <div className="mt-3 flex items-center justify-between">
+                            <Link
+                              className="text-[12px] font-medium underline text-[var(--plum-600)]"
+                              href={`/dashboard/dressmaker/portfolio/${item.id}/edit`}
+                            >
+                              Edit
+                            </Link>
+                            <DeleteButton id={item.id} />
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
             </CardBody>

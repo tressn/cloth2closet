@@ -24,7 +24,9 @@ type AttireType = (typeof ATTIRE_TYPES)[number];
 export default function EditPortfolioForm({ item }: { item: any }) {
   const [title, setTitle] = useState(item.title ?? "");
   const [attireType, setAttireType] = useState<AttireType>((item.attireType ?? "OTHER") as AttireType);
-  const [tagsText, setTagsText] = useState((item.tags ?? []).join(", "));
+  const [tagsText, setTagsText] = useState(
+    ((item.portfolioItemLabels ?? []).map((x: any) => x.label?.name).filter(Boolean)).join(", ")
+  );
   const [description, setDescription] = useState(item.description ?? "");
   const [isFeatured, setIsFeatured] = useState(!!item.isFeatured);
   const [saving, setSaving] = useState(false);
@@ -34,7 +36,7 @@ export default function EditPortfolioForm({ item }: { item: any }) {
     setSaving(true);
     setMessage(null);
 
-    const tags = tagsText.split(",").map((s) => s.trim()).filter(Boolean);
+    const tags = tagsText.split(",").map((s: string) => s.trim()).filter(Boolean);
 
     const res = await fetch(`/api/portfolio-items/${item.id}`, {
       method: "PATCH",
