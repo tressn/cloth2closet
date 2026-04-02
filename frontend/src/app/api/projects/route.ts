@@ -8,60 +8,99 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function parseDateOnly(value: unknown): Date | null {
+  if (typeof value !== "string" || !value) return null;
+
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isPastDateOnly(date: Date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
 
   const body = await req.json().catch(() => ({}));
 
   const dressmakerProfileId = asString(body?.dressmakerProfileId);
   const title = asString(body?.title);
-  const fabricNotes = typeof body?.fabricNotes === "string" ? body.fabricNotes.trim() : null;
+  const fabricNotes =
+    typeof body?.fabricNotes === "string" ? body.fabricNotes.trim() : null;
 
   const eventDateRaw = body?.eventDate;
-  const eventDate = typeof eventDateRaw === "string" && eventDateRaw ? new Date(eventDateRaw) : null;
+  const eventDate = eventDateRaw ? parseDateOnly(eventDateRaw) : null;
 
   const isRush = Boolean(body?.isRush);
   const wantsCalico = Boolean(body?.wantsCalico);
+  const requireSketch = Boolean(body?.requireSketch);
 
   if (!dressmakerProfileId) {
     return NextResponse.json({ error: "dressmakerProfileId is required" }, { status: 400 });
   }
+
   if (!title) {
     return NextResponse.json({ error: "title is required" }, { status: 400 });
+  }
+
+  if (eventDateRaw && !eventDate) {
+    return NextResponse.json({ error: "Event date is invalid" }, { status: 400 });
+  }
+
+  if (eventDate && isPastDateOnly(eventDate)) {
+    return NextResponse.json(
+      { error: "Event date can’t be in the past." },
+      { status: 400 }
+    );
   }
 
   const dm = await prisma.dressmakerProfile.findUnique({
     where: { id: dressmakerProfileId },
     select: { id: true, userId: true, isPublished: true, isPaused: true },
   });
-  if (!dm) return NextResponse.json({ error: "Dressmaker not found" }, { status: 404 });
-  if (!dm.isPublished || dm.isPaused) {
-    return NextResponse.json({ error: "Dressmaker is not accepting requests" }, { status: 400 });
+
+  if (!dm) {
+    return NextResponse.json({ error: "Dressmaker not found" }, { status: 404 });
   }
 
-  const projectCode = `P-${Date.now()}-${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
+  if (!dm.isPublished || dm.isPaused) {
+    return NextResponse.json(
+      { error: "Dressmaker is not accepting requests" },
+      { status: 400 }
+    );
+  }
 
-  const intro =
-    [
-      `New quote request: ${title}`,
-      `Project: ${projectCode}`,
-      "",
-      `Event date: ${eventDate ? eventDate.toDateString() : "Not set"}`,
-      `Rush: ${isRush ? "Yes" : "No"}`,
-      `Calico mockup: ${wantsCalico ? "Yes" : "No"}`,
-      "",
-      fabricNotes ? `Customer notes:\n${fabricNotes}` : null,
-      "",
-      "Suggested questions:",
-      "• Budget range?",
-      "• Measurements + fit preferences?",
-      "• Fabric choice + who sources it?",
-      "• Shipping city + deadlines?",
-      "• Rush fees / calico timeline?",
-    ]
-      .filter(Boolean)
-      .join("\n");
+  const projectCode = `P-${Date.now()}-${Math.random()
+    .toString(16)
+    .slice(2, 8)
+    .toUpperCase()}`;
+
+  const intro = [
+    `New quote request: ${title}`,
+    `Project: ${projectCode}`,
+    "",
+    `Event date: ${eventDate ? eventDate.toDateString() : "Not set"}`,
+    `Rush: ${isRush ? "Yes" : "No"}`,
+    `Calico mockup: ${wantsCalico ? "Yes" : "No"}`,
+    `Sketch approval required: ${requireSketch ? "Yes" : "No"}`,
+    "",
+    fabricNotes ? `Customer notes:\n${fabricNotes}` : null,
+    "",
+    "Suggested questions:",
+    "• Budget range?",
+    "• Measurements + fit preferences?",
+    "• Fabric choice + who sources it?",
+    "• Shipping city + deadlines?",
+    "• Rush fees / calico timeline?",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const project = await prisma.project.create({
     data: {
@@ -75,8 +114,12 @@ export async function POST(req: Request) {
           eventDate,
           fabricNotes,
           referenceImages: [],
+          sketchImage: [],
           isRush,
           wantsCalico,
+          requireSketch,
+          finalImages: [],
+          measurementsRequested: [],
         },
       },
     },
@@ -110,6 +153,9 @@ export async function POST(req: Request) {
     },
   });
 
-
-  return NextResponse.json({ ok: true, projectId: project.id, conversationId: convo.id });
+  return NextResponse.json({
+    ok: true,
+    projectId: project.id,
+    conversationId: convo.id,
+  });
 }

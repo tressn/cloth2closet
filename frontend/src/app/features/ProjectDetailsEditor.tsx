@@ -1,9 +1,21 @@
 "use client"
 import { useState } from "react"
 
+function isPastDate(value: string) {
+  if (!value) return false;
+
+  const selected = new Date(`${value}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return selected < today;
+}
+
 export default function ProjectDetailsEditor({ projectId, initial }: { projectId: string; initial: any }) {
   const [eventDate, setEventDate] = useState(initial?.eventDate?.slice?.(0, 10) ?? "")
   const [shipByDate, setShipByDate] = useState(initial?.shipByDate?.slice?.(0, 10) ?? "")
+  const eventDateError = isPastDate(eventDate) ? "Event date can’t be in the past." : "";
+  const shipByDateError = isPastDate(shipByDate) ? "Ship-by date can’t be in the past." : "";
   const [fabricNotes, setFabricNotes] = useState(initial?.fabricNotes ?? "")
   const [fabricAgreed, setFabricAgreed] = useState(!!initial?.fabricAgreed)
   const [fabricAgreedNote, setFabricAgreedNote] = useState(initial?.fabricAgreedNote ?? "")
@@ -12,6 +24,20 @@ export default function ProjectDetailsEditor({ projectId, initial }: { projectId
   const [loading, setLoading] = useState(false)
 
   async function save() {
+    if (eventDateError) {
+      setMsg(eventDateError);
+      return;
+    }
+
+    if (shipByDateError) {
+      setMsg(shipByDateError);
+      return;
+    }
+
+    if (eventDate && shipByDate && new Date(`${shipByDate}T00:00:00`) > new Date(`${eventDate}T00:00:00`)) {
+      setMsg("Ship-by date must be on or before the event date.");
+      return;
+    }
     setLoading(true)
     setMsg(null)
 

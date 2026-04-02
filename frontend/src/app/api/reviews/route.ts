@@ -34,11 +34,11 @@ export async function POST(req: Request) {
   if (!project) return bad("Project not found", 404);
 
   // RULES (verified reviews)
-  if (project.customerId !== userId) return bad("Forbidden", 403);
-  if (project.status !== "COMPLETED") return bad("Project must be completed");
-  if (!project.payment || project.payment.status !== "SUCCEEDED") {
-    return bad("Payment must be settled");
-  }
+  // if (project.customerId !== userId) return bad("Forbidden", 403);
+  // if (project.status !== "COMPLETED") return bad("Project must be completed");
+  // if (!project.payment || project.payment.status !== "SUCCEEDED") {
+  //   return bad("Payment must be settled");
+  // }
   if (project.review) return bad("Review already exists for this project", 409);
 
   // Create verified review

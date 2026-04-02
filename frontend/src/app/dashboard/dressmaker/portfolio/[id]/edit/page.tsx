@@ -33,8 +33,7 @@ export default async function EditPortfolioItemPage({ params }: { params: Promis
       subtitle="Keep it concise. Luxury reads clean."
       tabs={[
         { label: "Back to portfolio", href: "/dashboard/dressmaker/portfolio" },
-        { label: "Profile", href: "/dashboard/dressmaker/profile" },
-        { label: "Projects", href: "/dashboard/dressmaker/projects" },
+        { label: "Labels", href: "/dashboard/dressmaker/labels" },
       ]}
     >
       <div className="max-w-2xl">

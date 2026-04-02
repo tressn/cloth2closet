@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -39,6 +40,12 @@ async function putToS3(uploadUrl: string, file: File) {
 }
 
 export default function SupportForm() {
+
+  const { data: session, status: authStatus } = useSession();
+  const loggedIn = authStatus === "authenticated";
+  const sessionEmail = (session?.user as any)?.email as string | undefined;
+  const [email, setEmail] = useState("");
+
   const [category, setCategory] = useState("ACCOUNT_ROLE");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -46,7 +53,10 @@ export default function SupportForm() {
 
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const MAX_MESSAGE_LENGTH = 2000;
+  const MIN_MESSAGE_LENGTH = 10;
 
   const attachments = useMemo(
     () => uploads.filter((u) => u.status === "done" && u.publicUrl).map((u) => u.publicUrl!),
@@ -72,11 +82,14 @@ export default function SupportForm() {
     const pid = projectId.trim();
     if (!pid) throw new Error("Add a Project ID to attach images (so we can authorize access).");
 
-    const snapshot = uploads;
+    const queuedIndices = uploads
+    .map((u, idx) => (u.status === "queued" ? idx : -1))
+    .filter((idx) => idx !== -1);
 
-    for (let i = 0; i < snapshot.length; i++) {
-      const u = snapshot[i];
-      if (u.status !== "queued") continue;
+    for (const i of queuedIndices) {
+        const u = uploads[i];
+        if (!u || u.status !== "queued") continue;
+
 
       setUploads((prev) => prev.map((x, idx) => (idx === i ? { ...x, status: "uploading" } : x)));
 
@@ -94,11 +107,21 @@ export default function SupportForm() {
 
   async function submit() {
     setLoading(true);
-    setStatus(null);
+    setNotice(null);
 
     try {
       if (!subject.trim()) throw new Error("Subject is required");
       if (!message.trim()) throw new Error("Message is required");
+      if (!loggedIn) {
+        const e = email.trim();
+        if (!e) throw new Error("Email is required so support can reply.");
+        // simple email sanity check (not perfect, but good UX)
+        if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error("Please enter a valid email.");
+      }
+
+      if (!loggedIn && uploads.length > 0) {
+        throw new Error("Please sign in to attach images for security.");
+      }
 
       if (uploads.some((u) => u.status === "queued")) {
         await uploadAllQueued();
@@ -114,6 +137,7 @@ export default function SupportForm() {
           category,
           subject: subject.trim(),
           message: message.trim(),
+          email: loggedIn ? (sessionEmail ?? null) : email.trim(),
           projectId: projectId.trim() || null,
           attachmentUrls: attachments,
         }),
@@ -126,9 +150,9 @@ export default function SupportForm() {
       setMessage("");
       setProjectId("");
       setUploads([]);
-      setStatus("Sent! Support will follow up.");
+      setNotice("Sent! Support will follow up.");
     } catch (e: any) {
-      setStatus(e?.message ?? "Error");
+      setNotice(e?.message ?? "Error");
     } finally {
       setLoading(false);
     }
@@ -149,15 +173,44 @@ export default function SupportForm() {
           <option value="TECHNICAL">Technical</option>
           <option value="OTHER">Other</option>
         </select>
+
+        {!loggedIn ? (
+            <Input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Your email (so we can reply)"
+            />
+      ) : null}
       </div>
 
       <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" />
-      <Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Describe the issue…" />
+      <Textarea
+        value={message}
+        onChange={(e) => {
+            if (e.target.value.length <= MAX_MESSAGE_LENGTH) {
+            setMessage(e.target.value);
+            }
+        }}
+        placeholder="Describe the issue…"
+        maxLength={MAX_MESSAGE_LENGTH}
+        />
+        <div className="flex justify-end text-[12px] text-[var(--muted)]">{message.length}/{MAX_MESSAGE_LENGTH}</div>
       <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="Project ID (optional, required for attachments)" />
 
       <div className="grid gap-2">
         <div className="text-[13px] text-[var(--muted)]">Attach images (optional, up to 5)</div>
-        <input type="file" accept="image/*" multiple onChange={(e) => onPickFiles(e.target.files)} />
+        <input
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={!loggedIn}
+            onChange={(e) => onPickFiles(e.target.files)}
+            />
+            {!loggedIn ? (
+            <div className="text-[12px] text-[var(--muted)]">
+                Sign in to attach images.
+            </div>
+            ) : null}
 
         {uploads.length ? (
           <div className="grid gap-2">
@@ -186,7 +239,7 @@ export default function SupportForm() {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-[13px] text-[var(--muted)]">{status ?? " "}</div>
+        <div className="text-[13px] text-[var(--muted)]">{notice ?? " "}</div>
         <Button type="button" variant="primary" disabled={loading} onClick={submit}>
           {loading ? "Sending..." : "Send"}
         </Button>

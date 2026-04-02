@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const details =
     project.details ??
     (await prisma.projectDetails.create({
-      data: { projectId: project.id, referenceImages: [], sketchImages: [] },
+      data: { projectId: project.id, referenceImages: [], sketchImage: [] },
     }))
 
   // Append URLs to ProjectDetails.referenceImages

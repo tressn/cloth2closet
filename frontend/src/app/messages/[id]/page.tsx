@@ -5,10 +5,13 @@ import { notFound } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import MessageComposer from "./MessageComposer";
 import MessagesShell from "../MessagesShell";
+import AutoScrollToBottom from "./AutoScrollToBottom";
 
 function AttachmentGallery({ urls, mine }: { urls: string[]; mine: boolean }) {
   const safe = Array.isArray(urls) ? urls.filter(Boolean).slice(0, 10) : [];
   if (safe.length === 0) return null;
+
+  const thumb = "h-12 w-12";
 
   return (
     <div className="mt-3">
@@ -31,7 +34,9 @@ function AttachmentGallery({ urls, mine }: { urls: string[]; mine: boolean }) {
               alt="Attachment"
               loading="lazy"
               referrerPolicy="no-referrer"
-              className="h-40 w-full object-cover"
+              className={["grid gap-2",
+                  safe.length === 1 ? "grid-cols-1" : "grid-cols-2",
+                ].join(" ")}
             />
           </a>
         ))}
@@ -60,7 +65,15 @@ export default async function ConversationPage({
   // Fetch convo for right panel
   const convo = await prisma.conversation.findUnique({
     where: { id },
-    include: { project: true, messages: { orderBy: { createdAt: "asc" } } },
+    include: {
+      project: true,
+      messages: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          files: { select: { url: true, purpose: true } },
+        },
+      },
+    },
   });
 
   if (!convo) notFound();
@@ -81,7 +94,10 @@ export default async function ConversationPage({
       project: true,
       customer: { select: { id: true, name: true, email: true } },
       dressmaker: { select: { id: true, name: true, email: true } },
-      messages: { take: 1, orderBy: { createdAt: "desc" } },
+      messages: { take: 1, 
+        orderBy: { createdAt: "desc" }, 
+        include: { files: { select: { url: true, purpose: true } } }
+    },
       conversationReads: { where: { userId }, take: 1, select: { lastReadAt: true } },
     },
   });
@@ -94,14 +110,16 @@ export default async function ConversationPage({
           {convos.map((c) => {
             const last = c.messages[0];
             const lastText = previewText(last?.text);
-            const photoCount = Array.isArray(last?.attachments) ? last!.attachments.length : 0;
+            const photoCount =
+              last?.files?.filter((f: any) => f.purpose === "MESSAGE_ATTACHMENT").length
+              ?? (Array.isArray((last as any)?.attachments) ? (last as any).attachments.length : 0);
 
             const read = c.conversationReads[0]?.lastReadAt ?? null;
             const lastAt = last?.createdAt ?? c.updatedAt;
             const isNew = read ? lastAt > read : true;
 
             const other = c.customerId === userId ? c.dressmaker : c.customer;
-            const otherName = other?.name || other?.email || "Conversation";
+            const otherName = other?.name || other?.email || "Them";
 
             const active = c.id === convo.id;
 
@@ -161,7 +179,14 @@ export default async function ConversationPage({
         <div className="space-y-3">
           {convo.messages.map((m) => {
             const mine = m.senderId === userId;
-            const attachments = Array.isArray(m.attachments) ? m.attachments : [];
+            const attachments = Array.isArray(m.files) && m.files.length
+                ? m.files
+                    .filter((f) => f.purpose === "MESSAGE_ATTACHMENT")
+                    .map((f) => f.url)
+                    .filter(Boolean)
+                : Array.isArray((m as any).attachments)
+                  ? (m as any).attachments
+                  : [];
 
             return (
               <div key={m.id} className={mine ? "flex justify-end" : "flex justify-start"}>
@@ -186,6 +211,7 @@ export default async function ConversationPage({
               </div>
             );
           })}
+          <AutoScrollToBottom />
         </div>
 
         <div className="mt-6 border-t border-[var(--border)] pt-5">

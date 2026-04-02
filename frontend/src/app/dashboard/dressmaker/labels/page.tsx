@@ -22,11 +22,6 @@ export default async function DressmakerLabelsPage() {
     <DashboardShell
       title="Labels"
       subtitle="Propose labels for standardized tagging. Admin approves to keep things consistent."
-      tabs={[
-        { label: "Projects", href: "/dashboard/dressmaker/projects" },
-        { label: "Portfolio", href: "/dashboard/dressmaker/portfolio" },
-        { label: "Profile", href: "/dashboard/dressmaker/profile" },
-      ]}
     >
       <div className="max-w-4xl space-y-6">
         <Card>

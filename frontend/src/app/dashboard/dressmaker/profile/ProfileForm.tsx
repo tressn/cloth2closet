@@ -17,13 +17,14 @@ type Profile = {
 
   languageCodes: string[];
 
-  basePriceFrom: number | null;
+  basePriceFrom: number | null; // dollars
   currency: string;
   yearsExperience: number | null;
 
   specialties: string[];
   websiteUrl: string | null;
   instagramHandle: string | null;
+  tiktokHandle: string | null;
 };
 
 const CURRENCIES = ["USD", "CAD", "EUR", "GBP"] as const;
@@ -32,7 +33,9 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
   const [displayName, setDisplayName] = useState(initialProfile.displayName ?? "");
   const [bio, setBio] = useState(initialProfile.bio ?? "");
 
-  const [specialtiesText, setSpecialtiesText] = useState((initialProfile.specialties ?? []).join(", "));
+  const [specialtiesText, setSpecialtiesText] = useState(
+    (initialProfile.specialties ?? []).join(", ")
+  );
 
   const [basePriceFrom, setBasePriceFrom] = useState(
     initialProfile.basePriceFrom != null ? String(initialProfile.basePriceFrom) : ""
@@ -44,6 +47,7 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
 
   const [websiteUrl, setWebsiteUrl] = useState(initialProfile.websiteUrl ?? "");
   const [instagramHandle, setInstagramHandle] = useState(initialProfile.instagramHandle ?? "");
+  const [tiktokHandle, setTiktokHandle] = useState(initialProfile.tiktokHandle ?? "");
 
   const [countryCode, setCountryCode] = useState(initialProfile.countryCode ?? "");
   const [timezoneIana, setTimezoneIana] = useState(initialProfile.timezoneIana ?? "");
@@ -57,20 +61,27 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const previewPrice = useMemo(() => {
+  const pricePreview = useMemo(() => {
     const n = Number(basePriceFrom);
-    if (!basePriceFrom.trim() || !Number.isFinite(n)) return null;
-    return (n / 100).toFixed(2);
-  }, [basePriceFrom]);
+    if (!basePriceFrom.trim() || !Number.isFinite(n) || n < 0) return null;
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(n);
+  }, [basePriceFrom, currency]);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         const [c, t, l] = await Promise.all([
-          fetch("/api/lookups/countries").then((r) => r.json()),
-          fetch("/api/lookups/timezones").then((r) => r.json()),
-          fetch("/api/lookups/languages").then((r) => r.json()),
+          fetch("/api/lookups/countries", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/lookups/timezones", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/lookups/languages", { cache: "no-store" }).then((r) => r.json()),
         ]);
+        if (cancelled) return;
         setCountries(Array.isArray(c) ? c : []);
         setTimezones(Array.isArray(t) ? t : []);
         setLanguages(Array.isArray(l) ? l : []);
@@ -78,6 +89,10 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
         // ignore
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function toggleLanguage(code: string) {
@@ -94,6 +109,7 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
     setMessage(null);
 
     const specialties = specialtiesText.split(",").map((s) => s.trim()).filter(Boolean);
+
     const parsedBasePrice = basePriceFrom.trim().length ? Number(basePriceFrom) : null;
     const parsedYears = yearsExperience.trim().length ? Number(yearsExperience) : null;
 
@@ -103,17 +119,16 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
       body: JSON.stringify({
         displayName,
         bio,
-
         countryCode: countryCode || null,
         timezoneIana: timezoneIana || null,
         languageCodes,
-
-        basePriceFrom: parsedBasePrice,
+        basePriceFrom: parsedBasePrice, // dollars
         currency,
         yearsExperience: parsedYears,
         specialties,
         websiteUrl: websiteUrl.trim() || null,
         instagramHandle: instagramHandle.trim().replace(/^@/, "") || null,
+        tiktokHandle: tiktokHandle.trim().replace(/^@/, "") || null,
       }),
     });
 
@@ -128,97 +143,214 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
   }
 
   return (
-    <div className="grid gap-5">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Display name" hint="This appears publicly. Keep it simple + memorable.">
-          <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. Lina’s Atelier" />
-        </Field>
+    <div className="flex flex-col gap-12">
+      {/* SECTION: Public profile */}
+      <Section title="Public profile" subtitle="This information appears on your dressmaker page.">
+        <div className="grid gap-5 md:grid-cols-2">
+          <Field
+            label="Designer Label"
+          >
+            <Control>
+              <Input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Lina’s Atelier"
+              />
+            </Control>
+          </Field>
 
-        <Field label="Country">
-          <Select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
-            <option value="">Select country</option>
-            {countries.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </Select>
-        </Field>
-      </div>
+          <Field label="Country" hint="Where you're based (shown publicly).">
+            <Control>
+              <Select value={countryCode} onChange={(e: any) => setCountryCode(e.target.value)}>
+                <option value="">Select country</option>
+                {countries.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </Control>
+          </Field>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Timezone" hint="Shown for availability / scheduling.">
-          <Select value={timezoneIana} onChange={(e) => setTimezoneIana(e.target.value)}>
-            <option value="">Select timezone</option>
-            {timezones.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </Select>
-        </Field>
-      </div>
+          <Field label="Timezone" hint="Used for scheduling and availability.">
+            <Control>
+              <Select value={timezoneIana} onChange={(e: any) => setTimezoneIana(e.target.value)}>
+                <option value="">Select timezone</option>
+                {timezones.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            </Control>
+          </Field>
 
-      <Field label="Bio">
-        <Textarea value={bio} onChange={(e) => setBio(e.target.value)} />
-      </Field>
+          <Field label="Instagram handle" hint="No @ needed.">
+            <Control>
+              <Input
+                value={instagramHandle}
+                onChange={(e) => setInstagramHandle(e.target.value)}
+                placeholder="your handle"
+              />
+            </Control>
+          </Field>
 
-      <Field label="Languages" hint="Select the languages you can comfortably communicate in.">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {languages.map((l) => {
-            const checked = languageCodes.includes(l.value);
-            return (
-              <label key={l.value} className="flex items-center gap-2 text-[13px]">
-                <input type="checkbox" checked={checked} onChange={() => toggleLanguage(l.value)} />
-                <span>{l.label}</span>
-              </label>
-            );
-          })}
-          {languages.length === 0 ? <div className="text-[13px] opacity-70">No languages available.</div> : null}
+          <Field label="TikTok handle" hint="No @ needed.">
+            <Control>
+              <Input
+                value={tiktokHandle}
+                onChange={(e) => setTiktokHandle(e.target.value)}
+                placeholder="your handle"
+              />
+            </Control>
+          </Field>
         </div>
-      </Field>
 
-      <Field label="Specialties" hint="Comma-separated (e.g. bridal, eveningwear).">
-        <Input value={specialtiesText} onChange={(e) => setSpecialtiesText(e.target.value)} />
-      </Field>
+        <div className="mt-4">
+          <Field
+            label="Bio"
+            hint="A short intro: what you specialize in, typical turnaround, and what you love making."
+          >
+            <Textarea value={bio} onChange={(e) => setBio(e.target.value)} />
+          </Field>
+        </div>
+      </Section>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field
-          label="Base price from (cents)"
-          hint={previewPrice ? `Preview: ${currency} ${previewPrice}` : "Stored in cents (e.g. 50000 = $500.00)."}
-        >
-          <Input value={basePriceFrom} onChange={(e) => setBasePriceFrom(e.target.value)} placeholder="50000" />
-        </Field>
+      {/* SECTION: Skills */}
+      <Section title="Skills & Specialties" subtitle="Helps customers find you in search.">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Specialties" hint="Comma-separated (e.g. bridal, eveningwear, alterations).">
+            <Control>
+              <Input
+                value={specialtiesText}
+                onChange={(e) => setSpecialtiesText(e.target.value)}
+                placeholder="bridal, eveningwear, alterations"
+              />
+            </Control>
+          </Field>
 
-        <Field label="Currency">
-          <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </Select>
-        </Field>
+          <Field label="Website URL" hint="Optional. Include https://">
+            <Control>
+              <Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
+            </Control>
+          </Field>
+        </div>
 
-        <Field label="Years experience">
-          <Input value={yearsExperience} onChange={(e) => setYearsExperience(e.target.value)} placeholder="e.g. 5" />
-        </Field>
-      </div>
+        <div className="mt-4">
+          <Field label="Languages" hint="Select the languages you can comfortably communicate in.">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {languages.length === 0 ? (
+                <div className="text-[13px] text-[var(--muted)]">No languages available.</div>
+              ) : (
+                languages.map((l) => {
+                  const checked = languageCodes.includes(l.value);
+                  return (
+                    <label
+                      key={l.value}
+                      className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--text)] hover:bg-[var(--surface-2)]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleLanguage(l.value)}
+                        className="h-4 w-4"
+                      />
+                      <span className="truncate">{l.label}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </Field>
+        </div>
+      </Section>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Website URL">
-          <Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
-        </Field>
+      {/* SECTION: Pricing */}
+      <Section title="Pricing" subtitle="Displayed as your starting price. (Stored in dollars.)">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Field
+            label="Base price from"
+            hint={pricePreview ? `Preview: ${pricePreview}` : "Enter your minimum starting price in dollars."}
+          >
+            <Control>
+              <Input
+                value={basePriceFrom}
+                onChange={(e) => setBasePriceFrom(e.target.value)}
+                placeholder="100"
+                inputMode="numeric"
+              />
+            </Control>
+          </Field>
 
-        <Field label="Instagram handle" hint="No @ needed.">
-          <Input value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} />
-        </Field>
-      </div>
+          <Field label="Currency" hint="Shown publicly with your base price.">
+            <Control>
+              <Select value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </Control>
+          </Field>
 
-      <div className="flex items-center justify-between gap-3">
+          <Field label="Years of experience" hint="Optional, but builds trust.">
+            <Control>
+              <Input
+                value={yearsExperience}
+                onChange={(e) => setYearsExperience(e.target.value)}
+                placeholder="e.g. 5"
+                inputMode="numeric"
+              />
+            </Control>
+          </Field>
+        </div>
+      </Section>
+
+      {/* Footer */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Button type="button" onClick={onSave} disabled={saving} variant="primary">
           {saving ? "Saving..." : "Save changes"}
         </Button>
-        {message ? <div className="text-[13px] opacity-70">{message}</div> : null}
+
+        {message ? <div className="text-[13px] text-[var(--muted)]">{message}</div> : null}
       </div>
     </div>
   );
 }
 
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-8">
+      <div className="flex flex-col gap-2">
+        <div className="text-[15px] font-semibold tracking-[0.01em] text-[var(--text)]">
+          {title}
+        </div>
+        {subtitle ? (
+          <div className="max-w-2xl text-[13px] leading-6 text-[var(--muted)]">
+            {subtitle}
+          </div>
+        ) : null}
+      </div>
+
+      <div>{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Key alignment fix:
+ * - label and hint reserve space so fields in the same row feel aligned
+ * - controls are forced to full width
+ */
 function Field({
   label,
   hint,
@@ -229,10 +361,21 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="grid gap-2">
-      <div className="text-[12px] font-medium opacity-70">{label}</div>
-      {children}
-      {hint ? <div className="text-[12px] leading-5 opacity-70">{hint}</div> : null}
-    </label>
+    <div className="flex flex-col">
+      <div className="min-h-[18px] text-[12px] font-medium text-[var(--muted)]">{label}</div>
+      <div className="mt-2">{children}</div>
+      <div className="mt-2 min-h-[18px] text-[12px] leading-5 text-[var(--muted)]">
+        {hint ?? ""}
+      </div>
+    </div>
   );
+}
+
+/**
+ * Control wrapper:
+ * - forces consistent height + width across Input/Select
+ * - doesn't affect Textarea (you don't wrap Textarea with it)
+ */
+function Control({ children }: { children: React.ReactNode }) {
+  return <div className="w-full [&>*]:w-full [&_*]:h-11">{children}</div>;
 }

@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import ProfileForm from "./ProfileForm";
 import PublishToggle from "./PublishToggle";
 import SetupPayoutButton from "./SetupPayoutButton";
+import RequestReviewButton from "./RequestReviewButton";
 
 
 export default async function DressmakerProfilePage() {
@@ -26,16 +27,10 @@ export default async function DressmakerProfilePage() {
 
   if (!profile) redirect("/become-dressmaker");
 
+  const social = (profile.socialLinks ?? {}) as Record<string, unknown>;
+  const tiktokHandle = typeof social.tiktok === "string" ? social.tiktok : "";
+
   return (
-    <DashboardShell
-      title="Dressmaker dashboard"
-      subtitle="Edit your profile, publish it, and manage portfolio + projects."
-      tabs={[
-        { label: "Profile", href: "/dashboard/dressmaker/profile" },
-        { label: "Portfolio", href: "/dashboard/dressmaker/portfolio" },
-        { label: "Projects", href: "/dashboard/dressmaker/projects" },
-      ]}
-    >
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <Card>
@@ -46,12 +41,26 @@ export default async function DressmakerProfilePage() {
             <CardBody>
               <ProfileForm
                 initialProfile={{
-                  ...profile,
+                  displayName: profile.displayName ?? null,
+                  bio: profile.bio ?? null,
+
+                  countryCode: profile.countryCode ?? null,
+                  timezoneIana: profile.timezoneIana ?? null,
+
                   languageCodes: profile.languages ?? [],
+
+                  basePriceFrom: profile.basePriceFrom ?? null,
+                  currency: profile.currency ?? "USD",
+                  yearsExperience: profile.yearsExperience ?? null,
+
                   specialties: profile.dressmakerSpecialties
                     .map((x) => x.label)
                     .filter((l) => l.scope === "SPECIALTY" && l.status !== "REJECTED")
                     .map((l) => l.slug),
+
+                  websiteUrl: profile.websiteUrl ?? null,
+                  instagramHandle: profile.instagramHandle ?? null,
+                  tiktokHandle: tiktokHandle || null,
                 }}
               />
             </CardBody>
@@ -65,7 +74,20 @@ export default async function DressmakerProfilePage() {
               subtitle="Publish when your bio + portfolio are ready."
             />
             <CardBody>
-              <PublishToggle initialPublished={profile.isPublished} />
+              <PublishToggle
+                initialPublished={profile.isPublished}
+                approvalStatus={profile.approvalStatus}
+                rejectionReason={profile.rejectionReason}
+              />
+
+              {profile.approvalStatus === "REJECTED" ? (
+                <div className="mt-3">
+                  <RequestReviewButton />
+                  <div className="mt-2 text-[12px] leading-5 text-[var(--muted)]">
+                    After updating your profile, request review to re-enter the approval queue.
+                  </div>
+                </div>
+              ) : null}
               <div className="mt-3 text-[13px] leading-6 text-[var(--muted)]">
                 Tip: featured portfolio items help you look premium without needing lots of content.
               </div>
@@ -108,16 +130,12 @@ export default async function DressmakerProfilePage() {
           <Card>
             <CardHeader title="Quick links" />
             <CardBody className="space-y-2 text-[14px] text-[var(--muted)]">
-              <a className="underline" href={`/dressmakers/${profile.id}`}>
+              <a className="block underline" href={`/dressmakers/${profile.id}`}>
                 View your public profile
-              </a>
-              <a className="underline" href="/messages">
-                Messages
               </a>
             </CardBody>
           </Card>
         </div>
       </div>
-    </DashboardShell>
   );
 }

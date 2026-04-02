@@ -70,7 +70,7 @@ export async function POST(
       conversationId,
       senderId: userId,
       text: text || null,
-      attachments,
+      attachments: [],
     },
   })
 
@@ -83,6 +83,7 @@ export async function POST(
         messageId: message.id,
         projectId: convo.projectId ?? null,
       })),
+      skipDuplicates: true,
     })
   }
 

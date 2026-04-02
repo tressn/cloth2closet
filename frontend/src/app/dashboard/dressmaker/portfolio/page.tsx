@@ -45,9 +45,7 @@ export default async function DressmakerPortfolioPage() {
       title="Portfolio"
       subtitle="Curate what buyers see. Featured items help you look premium fast."
       tabs={[
-        { label: "Profile", href: "/dashboard/dressmaker/profile" },
-        { label: "Portfolio", href: "/dashboard/dressmaker/portfolio" },
-        { label: "Projects", href: "/dashboard/dressmaker/projects" },
+        { label: "Labels", href: "/dashboard/dressmaker/labels" },
       ]}
     >
       <div className="grid gap-6 lg:grid-cols-3">
@@ -77,23 +75,27 @@ export default async function DressmakerPortfolioPage() {
               {items.length === 0 ? (
                 <div className="text-[14px] text-[var(--muted)]">Add your first item above.</div>
               ) : (
-                <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-6 md:grid-cols-2">
                   {items.map((item) => {
                     const tags =
                       item.portfolioItemLabels
                         ?.map((x) => x.label)
                         .filter((l) => l.scope === "PORTFOLIO" && l.status !== "REJECTED")
-                        .map((l) => l.name) ?? [];
+                        .map((l) => ({ name: l.name, status: l.status })) ?? [];
 
                     return (
                       <article
                         key={item.id}
                         className="overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]"
                       >
-                        <div className="aspect-[1/1] bg-[var(--surface-2)]">
+                        <div className="relative aspect-[4/5] bg-[var(--surface-2)]">
                           {item.imageUrls?.[0] ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={item.imageUrls[0]} alt={item.title} className="h-full w-full object-cover" />
+                            <img
+                              src={item.imageUrls[0]}
+                              alt={item.title}
+                              className="h-full w-full object-contain p-2"
+                            />
                           ) : (
                             <div className="flex h-full items-center justify-center text-[12px] text-[var(--muted)]">
                               No image
@@ -104,31 +106,17 @@ export default async function DressmakerPortfolioPage() {
                         <div className="p-3">
                           <div className="truncate text-[13px] font-semibold text-[var(--text)]">{item.title}</div>
 
-                          <div className="mt-1 truncate text-[12px] text-[var(--muted)]">
-                            {item.attireType}
-                            {tags.length > 0 ? (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {tags.slice(0, 3).map((t) => (
-                                  <span
-                                    key={t}
-                                    className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] text-[var(--muted)]"
-                                  >
-                                    {t}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : null}
-                            {item.isFeatured ? " • Featured" : ""}
-                          </div>
 
                           {tags.length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {tags.slice(0, 3).map((t) => (
+                              {tags.slice(0, 6).map((t) => (
                                 <span
-                                  key={t}
+                                  key={`${t.name}-${t.status}`}
                                   className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-[var(--muted)]"
+                                  title={t.status === "PENDING" ? "Pending approval" : undefined}
                                 >
-                                  {t}
+                                  {t.name}
+                                  {t.status === "PENDING" ? " (pending)" : ""}
                                 </span>
                               ))}
                             </div>

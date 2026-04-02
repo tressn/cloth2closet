@@ -46,9 +46,13 @@ export async function POST(req: Request) {
     ? body.imageUrls.map((u: any) => String(u).trim()).filter(Boolean).slice(0, 10)
     : [];
 
-  // Dedupe + cap tags
-  const rawTags: string[] = Array.isArray(body?.tags) ? body.tags.map((t: any) => normalizeName(String(t))) : [];
-  const safeTags = Array.from(new Set(rawTags.filter(Boolean))).slice(0, 20);
+  const labelIds: string[] = Array.isArray(body?.labelIds)
+  ? body.labelIds
+      .map((x: unknown) => (typeof x === "string" ? x.trim() : ""))
+      .filter((x: string) => x.length > 0)
+      .slice(0, 20)
+  : [];
+  const rawLabelIds: string[] = Array.isArray(body?.labelIds) ? body.labelIds.map((x: any) => String(x).trim()) : [];
 
   if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
   if (imageUrls.length === 0) return NextResponse.json({ error: "At least 1 image is required" }, { status: 400 });
@@ -79,39 +83,22 @@ export async function POST(req: Request) {
       select: { id: true },
     });
 
-    if (safeTags.length) {
-      // 2) Upsert labels (scope=PORTFOLIO) and attach
-      const labelIds: string[] = [];
+    if (labelIds.length) {
+      // Only attach existing labels (portfolio scope); allow pending too
+      const existing = await tx.label.findMany({
+        where: {
+          id: { in: labelIds },
+          scope: LabelScope.PORTFOLIO,
+          status: { in: [LabelStatus.APPROVED, LabelStatus.PENDING] },
+        },
+        select: { id: true },
+      });
 
-      for (const t of safeTags) {
-        const slug = slugify(t);
-        if (!slug) continue;
+      const attachIds = existing.map((l) => l.id);
 
-        const label = await tx.label.upsert({
-          where: { scope_slug: { scope: LabelScope.PORTFOLIO, slug } }, // relies on @@unique([scope, slug])
-          update: {
-            // optional: keep name fresh (nice casing) without changing approval state
-            name: t,
-          },
-          create: {
-            name: t,
-            slug,
-            scope: LabelScope.PORTFOLIO,
-            status: LabelStatus.PENDING,
-            createdById: session.user.id,
-          },
-          select: { id: true },
-        });
-
-        labelIds.push(label.id);
-      }
-
-      if (labelIds.length) {
+      if (attachIds.length) {
         await tx.portfolioItemLabel.createMany({
-          data: labelIds.map((labelId) => ({
-            portfolioItemId: item.id,
-            labelId,
-          })),
+          data: attachIds.map((labelId) => ({ portfolioItemId: item.id, labelId })),
           skipDuplicates: true,
         });
       }

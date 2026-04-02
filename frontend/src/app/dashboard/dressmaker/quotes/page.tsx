@@ -26,7 +26,7 @@ export default async function DressmakerQuotesPage() {
     <Container>
       <main className="py-10">
         <Card>
-          <CardHeader title="My Quotes" subtitle="New quote requests waiting for your response." />
+          <CardHeader title="Quotes" subtitle="New quote requests waiting for your response." />
           <CardBody>
             {quotes.length === 0 ? (
               <div className="text-[14px] text-[var(--muted)]">No new quote requests right now.</div>

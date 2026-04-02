@@ -10,21 +10,22 @@ export default async function AdminSupportPage() {
   const tickets = await prisma.supportTicket.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,
-    include: {
-      user: { select: { email: true, name: true } },
-      project: { select: { id: true, projectCode: true, title: true } },
+    select: {
+        id: true,
+        subject: true,
+        message: true,
+        category: true,
+        status: true,
+        createdAt: true,
+        attachmentUrls: true,
+        requesterEmail: true,
+        userId: true,
+        user: { select: { email: true, name: true } },
+        project: { select: { id: true, projectCode: true, title: true } },
     },
-  });
+    });
 
   return (
-    <DashboardShell
-      title="Admin • Support"
-      subtitle="Support requests from users."
-      tabs={[
-        { label: "Support", href: "/dashboard/admin/support" },
-        { label: "Labels", href: "/dashboard/admin/labels" },
-      ]}
-    >
       <div className="max-w-5xl">
         <Card>
           <CardHeader title="Tickets" subtitle={`${tickets.length} recent`} />
@@ -42,7 +43,13 @@ export default async function AdminSupportPage() {
                       <div className="min-w-0">
                         <div className="text-[15px] font-semibold text-[var(--text)] truncate">{t.subject}</div>
                         <div className="mt-1 text-[12px] text-[var(--muted)]">
-                          From: {t.user.name ?? t.user.email} • {new Date(t.createdAt).toLocaleString()}
+                          {(() => {const from = t.user?.name ||t.user?.email ||t.requesterEmail ||"Guest";
+                            return (
+                                <>
+                                From: {from} • {new Date(t.createdAt).toLocaleString()}
+                                </>
+                            );
+                            })()}
                         </div>
 
                         <div className="mt-2 text-[13px] text-[var(--muted)] whitespace-pre-wrap">{t.message}</div>
@@ -91,6 +98,5 @@ export default async function AdminSupportPage() {
           </CardBody>
         </Card>
       </div>
-    </DashboardShell>
   );
 }

@@ -5,7 +5,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { COUNTRY_GROUPS, COUNTRIES } from "@/lib/lookup/countries";
+import { COUNTRIES } from "@/lib/lookup/countries";
+import TagsFilterClient from "./TagsFilter.client";
 
 const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
@@ -17,7 +18,7 @@ export default async function DressmakersListPage({
   const sp = await searchParams;
 
   const q = getFirst(sp.q)?.trim() ?? "";
-  const countryCode = getFirst(sp.countryCode)?.trim() ?? ""; // ✅ was location
+  const countryCode = getFirst(sp.countryCode)?.trim() ?? "";
   const language = getFirst(sp.language)?.trim() ?? "";
   const minPriceRaw = getFirst(sp.minPrice)?.trim() ?? "";
   const minPrice = minPriceRaw ? Number(minPriceRaw) : undefined;
@@ -28,16 +29,42 @@ export default async function DressmakersListPage({
     approvalStatus: "APPROVED",
   };
 
+  const tagIdsRaw = sp.tag;
+  const tagIds = (Array.isArray(tagIdsRaw) ? tagIdsRaw : tagIdsRaw ? [tagIdsRaw] : [])
+    .map((x) => String(x).trim())
+    .filter(Boolean)
+      .slice(0, 10);
+
   if (q) {
     where.OR = [
       { displayName: { contains: q, mode: "insensitive" } },
       { bio: { contains: q, mode: "insensitive" } },
-      // ✅ specialties live in Labels now
+
+      // Specialty labels
       {
         dressmakerSpecialties: {
           some: {
             label: {
+              status: "APPROVED",
+              scope: "SPECIALTY",
               name: { contains: q, mode: "insensitive" },
+            },
+          },
+        },
+      },
+
+      // ✅ Portfolio labels
+      {
+        portfolioItems: {
+          some: {
+            portfolioItemLabels: {
+              some: {
+                label: {
+                  status: "APPROVED",
+                  scope: "PORTFOLIO",
+                  name: { contains: q, mode: "insensitive" },
+                },
+              },
             },
           },
         },
@@ -45,12 +72,41 @@ export default async function DressmakersListPage({
     ];
   }
 
-  // ✅ country filter
-  if (countryCode) where.countryCode = countryCode;
+  if (tagIds.length) {
+    // AND with other filters, but OR within selected tags
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : []),
+      {
+        OR: [
+          // Match portfolio item labels
+          {
+            portfolioItems: {
+              some: {
+                portfolioItemLabels: {
+                  some: {
+                    labelId: { in: tagIds },
+                  },
+                },
+              },
+            },
+          },
 
+          // Optional: also match specialties by same label ids
+          {
+            dressmakerSpecialties: {
+              some: {
+                labelId: { in: tagIds },
+              },
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  if (countryCode) where.countryCode = countryCode;
   if (language) where.languages = { has: language };
 
-  // NOTE: basePriceFrom is stored in cents in your schema comments
   if (typeof minPrice === "number" && Number.isFinite(minPrice)) {
     where.basePriceFrom = { gte: Math.max(0, Math.trunc(minPrice)) };
   }
@@ -62,15 +118,20 @@ export default async function DressmakersListPage({
     select: {
       id: true,
       displayName: true,
-      countryCode: true, // ✅ was location
+      countryCode: true,
       basePriceFrom: true,
       currency: true,
       yearsExperience: true,
       languages: true,
       dressmakerSpecialties: {
-        select: {
-          label: { select: { name: true } },
-        },
+        select: { label: { select: { name: true } } },
+      },
+
+      // ✅ NEW: pull a small slice of portfolio items for thumbnails
+      portfolioItems: {
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: { id: true, imageUrls: true, isFeatured: true },
       },
     },
   });
@@ -88,13 +149,18 @@ export default async function DressmakersListPage({
             </div>
 
             <Card className="mt-6">
-              <CardHeader title="Search" subtitle="Tip: try “bridal”, “eveningwear”, “alterations”, or a specialty label." />
+              <CardHeader
+                title="Search"
+                subtitle="Tip: try “bridal”, “eveningwear”, “alterations”, or a specialty label."
+              />
               <CardBody>
                 <SearchBar initial={{ q, countryCode, language, minPrice: minPriceRaw }} />
+                <TagsFilterClient />
 
                 <div className="mt-4 text-[14px] text-[var(--muted)]">
-                  Showing <span className="font-semibold text-[var(--text)]">{dressmakers.length}</span> result
-                  {dressmakers.length === 1 ? "" : "s"}
+                  Showing{" "}
+                  <span className="font-semibold text-[var(--text)]">{dressmakers.length}</span>{" "}
+                  result{dressmakers.length === 1 ? "" : "s"}
                 </div>
               </CardBody>
             </Card>
@@ -104,16 +170,29 @@ export default async function DressmakersListPage({
                 const label = d.countryCode ? COUNTRY_LABEL_BY_CODE.get(d.countryCode) ?? d.countryCode : null;
 
                 const specialties = d.dressmakerSpecialties
-                  .map((s: { label: { name: string } }) => s.label.name) // ✅ fixes implicit any
+                  .map((s: { label: { name: string } }) => s.label.name)
                   .filter(Boolean);
+
+                // ✅ Thumbnails: featured first, then recent, take 3
+                const thumbs = (d.portfolioItems ?? [])
+                  .filter((p) => p.imageUrls?.[0])
+                  .sort((a, b) => Number(!!b.isFeatured) - Number(!!a.isFeatured))
+                  .slice(0, 3)
+                  .map((p) => ({
+                    id: p.id,
+                    url: p.imageUrls[0]!,
+                    featured: !!p.isFeatured,
+                  }));
 
                 return (
                   <Link key={d.id} href={`/dressmakers/${d.id}`} className="block">
                     <Card className="h-full hover:shadow-[0_14px_36px_rgba(27,20,24,0.12)]">
                       <CardBody>
                         <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="text-[16px] font-semibold text-[var(--text)]">{d.displayName ?? "Dressmaker"}</div>
+                          <div className="min-w-0">
+                            <div className="truncate text-[16px] font-semibold text-[var(--text)]">
+                              {d.displayName ?? "Dressmaker"}
+                            </div>
 
                             {label ? (
                               <div className="mt-2 text-[14px] text-[var(--muted)]">📍 {label}</div>
@@ -125,10 +204,45 @@ export default async function DressmakersListPage({
                           {d.yearsExperience != null ? <Badge tone="neutral">{d.yearsExperience} yrs</Badge> : null}
                         </div>
 
+                        {/* ✅ Thumbnail strip */}
+                        {thumbs.length ? (
+                          <div className="mt-4 flex items-center gap-1.5">
+                            {thumbs.map((t) => (
+                              <div
+                                key={t.id}
+                                className="relative aspect-[4/5] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-2)]"
+                                title={t.featured ? "Featured work" : "Recent work"}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={t.url}
+                                  alt="Portfolio thumbnail"
+                                  className="h-full w-full object-cover object-center"
+                                  loading="lazy"
+                                />
+                                {t.featured ? (
+                                  <span className="absolute left-1 top-1 rounded-full bg-[var(--plum-600)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                                    ★
+                                  </span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mt-4 text-[13px] text-[var(--muted)]">
+                            No portfolio images yet.
+                          </div>
+                        )}
+
                         <div className="mt-4 text-[14px] text-[var(--muted)]">
                           💰{" "}
                           {d.basePriceFrom != null
-                            ? `${formatCents(d.basePriceFrom)} ${d.currency}`
+                            ? new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: d.currency,
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              }).format(d.basePriceFrom)
                             : "Pricing not listed"}
                         </div>
 
@@ -168,10 +282,6 @@ function getFirst(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
 }
 
-function formatCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 function SearchBar({
   initial,
 }: {
@@ -195,14 +305,10 @@ function SearchBar({
             className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[15px] text-[var(--text)]"
           >
             <option value="">Any country</option>
-            {COUNTRY_GROUPS.map((group) => (
-              <optgroup key={group.continent} label={group.continent}>
-                {group.countries.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </optgroup>
+            {COUNTRIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
             ))}
           </select>
         </div>
@@ -216,9 +322,9 @@ function SearchBar({
       </div>
 
       <div>
-        <div className="text-[12px] font-medium text-[var(--muted)]">Min price (cents)</div>
+        <div className="text-[12px] font-medium text-[var(--muted)]">Min price</div>
         <div className="mt-2">
-          <Input name="minPrice" defaultValue={initial.minPrice} placeholder="50000" />
+          <Input name="minPrice" defaultValue={initial.minPrice} placeholder="500" />
         </div>
       </div>
 

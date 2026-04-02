@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
+import { useEffect, useState } from "react";
 
 export default function NavBar() {
   const { data: session, status } = useSession();
@@ -15,6 +16,31 @@ export default function NavBar() {
 
   const loggedIn = status === "authenticated";
 
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/conversations/unread", { cache: "no-store" });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setHasUnread(!!data?.hasUnread);
+      } catch {
+        // ignore
+      }
+    }
+
+    load();
+    const t = setInterval(load, 30000); // 30s
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [loggedIn]);
+
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[rgba(255,255,255,0.85)] backdrop-blur">
       <Container>
@@ -26,21 +52,18 @@ export default function NavBar() {
 
             <nav className="hidden items-center gap-5 text-[14px] font-medium text-[var(--muted)] md:flex">
               <Link className="hover:text-[var(--text)]" href="/feed">Feed</Link>
-              <Link className="hover:text-[var(--text)]" href="/dressmakers">Dressmakers</Link>
-              <Link className="hover:text-[var(--text)]" href="/messages">Messages</Link>
+              <Link className="hover:text-[var(--text)]" href="/dressmakers">Designers</Link>
+              <Link className="hover:text-[var(--text)] relative" href="/messages">
+                Messages
+                {hasUnread ? (
+                  <span className="ml-2 inline-block h-2 w-2 rounded-full bg-[var(--plum-500)] align-middle" />
+                ) : null}
+              </Link>
 
               {loggedIn ? (
                 <>
                   <span className="mx-1 h-4 w-px bg-[var(--border)]" />
                   <Link className="hover:text-[var(--text)]" href="/dashboard">Dashboard</Link>
-
-                  {(role === "DRESSMAKER" || role === "ADMIN") ? (
-                    <>
-                      <Link className="hover:text-[var(--text)]" href="/dashboard/dressmaker/profile">Profile</Link>
-                      <Link className="hover:text-[var(--text)]" href="/dashboard/dressmaker/portfolio">Portfolio</Link>
-                      <Link className="hover:text-[var(--text)]" href="/dashboard/dressmaker/projects">Projects</Link>
-                    </>
-                  ) : null}
                 </>
               ) : (
                 <>
@@ -49,6 +72,7 @@ export default function NavBar() {
                   <Link className="hover:text-[var(--text)]" href="/register">Sign up</Link>
                 </>
               )}
+              <Link className="hover:text-[var(--text)]" href="/support">Help</Link>
             </nav>
           </div>
 

@@ -10,6 +10,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import SaveDressmakerButton from "./SaveDressmakerButton";
 import { COUNTRIES } from "@/lib/lookup/countries";
+import PortfolioGalleryModal from "./PortfolioGalleryModal";
 
 const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
@@ -28,7 +29,7 @@ export default async function DressmakerPublicPage({
         include: { label: true },
       },
       portfolioItems: {
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
         include: {
           portfolioItemLabels: {
             include: { label: true },
@@ -54,6 +55,37 @@ export default async function DressmakerPublicPage({
         select: { id: true },
       }))
     : false;
+  
+    // --- Reviews for this dressmaker (via projects) ---
+  const [reviewAgg, reviews] = await Promise.all([
+    prisma.review.aggregate({
+      where: { project: { dressmakerId: dressmaker.userId } },
+      _avg: { rating: true },
+      _count: { rating: true },
+    }),
+    prisma.review.findMany({
+      where: { project: { dressmakerId: dressmaker.userId } },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      select: {
+        id: true,
+        rating: true,
+        text: true,
+        photoUrls: true,
+        isVerified: true,
+        createdAt: true,
+        author: { select: { name: true } },
+        project: { select: { projectCode: true } },
+      },
+    }),
+  ]);
+
+  const avgRating = reviewAgg._avg.rating ?? null;
+  const reviewCount = reviewAgg._count.rating ?? 0;
+
+  function fmtAvg(x: number) {
+    return (Math.round(x * 10) / 10).toFixed(1);
+  }
 
   return (
     <div className="bg-[var(--bg)]">
@@ -75,7 +107,18 @@ export default async function DressmakerPublicPage({
                       {dressmaker.yearsExperience != null ? (
                         <Badge tone="neutral">{dressmaker.yearsExperience} yrs</Badge>
                       ) : null}
-                      {dressmaker.isPublished ? <Badge tone="success">Published</Badge> : null}
+                      {dressmaker.isPublished && dressmaker.approvalStatus === "APPROVED" ? (
+                          <Badge tone="success">Published</Badge>
+                        ) : dressmaker.approvalStatus === "PENDING" ? (
+                          <Badge tone="featured">Pending review</Badge>
+                        ) : dressmaker.approvalStatus === "REJECTED" ? (
+                          <Badge tone="danger">Needs changes</Badge>
+                        ) : null}
+                      {reviewCount > 0 ? (
+                        <Badge tone="success">{fmtAvg(avgRating!)} ★ ({reviewCount})</Badge>
+                      ) : (
+                        <Badge tone="neutral">No reviews</Badge>
+                      )}
                     </div>
                   }
                 />
@@ -84,7 +127,12 @@ export default async function DressmakerPublicPage({
                     <Badge tone="neutral">
                       💰{" "}
                       {dressmaker.basePriceFrom != null
-                        ? `${formatWhole(dressmaker.basePriceFrom)} ${dressmaker.currency}`
+                        ? new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: dressmaker.currency,
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          }).format(dressmaker.basePriceFrom)
                         : "Pricing not listed"}
                     </Badge>
 
@@ -106,7 +154,7 @@ export default async function DressmakerPublicPage({
                           ? "…"
                           : ""}
                       </Badge>
-) : null}
+                    ) : null}
                   </div>
 
                   {dressmaker.bio ? (
@@ -158,48 +206,70 @@ export default async function DressmakerPublicPage({
                   {dressmaker.portfolioItems.length === 0 ? (
                     <div className="text-[14px] text-[var(--muted)]">No portfolio items yet.</div>
                   ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {dressmaker.portfolioItems.map((item) => (
-                        <article
-                          key={item.id}
-                          className="overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]"
-                        >
-                          <div className="aspect-[4/3] bg-[var(--surface-2)]">
-                            {item.imageUrls?.[0] ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={item.imageUrls[0]}
-                                alt={item.title}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full items-center justify-center text-[13px] text-[var(--muted)]">
-                                Images coming soon
-                              </div>
-                            )}
+                    <PortfolioGalleryModal
+                      items={dressmaker.portfolioItems.map((p) => ({
+                        id: p.id,
+                        title: p.title,
+                        imageUrls: p.imageUrls ?? [],
+                      }))}
+                    />
+                  )}
+                </CardBody>
+              </Card>
+              {/*Review */}
+              <Card>
+                <CardHeader title="Reviews" subtitle="Verified reviews from completed projects." />
+                <CardBody>
+                  {reviews?.length ? (
+                    <div className="grid gap-4">
+                      <div className="text-[14px] text-[var(--muted)]">
+                        Recent reviews: <span className="font-semibold text-[var(--text)]">{reviews.length}</span>
+                      </div>
+                    
+                      {reviews.map((r) => (
+                        <div key={r.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-[13px] font-semibold text-[var(--text)]">
+                              {r.author?.name ?? "Customer"} • {r.rating}/5
+                              {r.isVerified ? <span className="ml-2 text-[12px] text-[var(--muted)]">✅ verified</span> : null}
+                            </div>
+                            <div className="text-[12px] text-[var(--muted)]">
+                              {new Date(r.createdAt).toLocaleDateString()}
+                            </div>
                           </div>
-                          <div className="p-4">
-                            <div className="text-[14px] font-semibold text-[var(--text)]">{item.title}</div>
-                            {item.portfolioItemLabels?.length ? (
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {item.portfolioItemLabels
-                                  .map((x) => x.label)
-                                  .filter((l) => l.scope === "PORTFOLIO" && l.status !== "REJECTED")
-                                  .slice(0, 3)
-                                  .map((l) => (
-                                    <span
-                                      key={l.id}
-                                      className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--muted)]"
-                                    >
-                                      {l.name}
-                                    </span>
-                                  ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        </article>
+
+                          {r.text ? (
+                            <div className="mt-2 text-[14px] text-[var(--muted)] whitespace-pre-wrap">
+                              {r.text}
+                            </div>
+                          ) : null}
+
+                          {r.photoUrls?.length ? (
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              {r.photoUrls.slice(0, 6).map((url: string, idx: number) => (
+                                <a
+                                  key={idx}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="block overflow-hidden rounded-lg border"
+                                >
+                                  <div className="aspect-square overflow-hidden leading-none">
+                                    <img
+                                      src={url}
+                                      alt="Review photo"
+                                      className="block h-full w-full object-cover object-center"
+                                    />
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
+                  ) : (
+                    <div className="text-[14px] text-[var(--muted)]">No reviews yet.</div>
                   )}
                 </CardBody>
               </Card>
@@ -218,18 +288,6 @@ export default async function DressmakerPublicPage({
                   </Link>
                 </CardBody>
               </Card>
-
-              <Card>
-                <CardHeader title="Trust" subtitle="Signals that help buyers feel confident." />
-                <CardBody>
-                  <ul className="space-y-2 text-[14px] leading-6 text-[var(--muted)]">
-                    <li>• Clear pricing expectations</li>
-                    <li>• Languages & specialties</li>
-                    <li>• Portfolio previews</li>
-                    <li>• Direct messaging</li>
-                  </ul>
-                </CardBody>
-              </Card>
             </div>
           </div>
         </main>
@@ -238,6 +296,3 @@ export default async function DressmakerPublicPage({
   );
 }
 
-function formatWhole(amount: number) {
-  return `$${amount}`;
-}

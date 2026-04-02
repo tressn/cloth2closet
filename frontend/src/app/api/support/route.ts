@@ -8,42 +8,80 @@ function bad(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
 }
 
+function isValidEmail(email: string) {
+  return /^\S+@\S+\.\S+$/.test(email);
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
-  if (!userId) return bad("Not authenticated", 401);
+  const userId = session?.user?.id ?? null;
 
   const body = await req.json().catch(() => ({}));
   const category = body?.category;
+
   const subject = typeof body?.subject === "string" ? body.subject.trim() : "";
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   const projectId = typeof body?.projectId === "string" ? body.projectId.trim() : null;
+
+  const emailRaw = typeof body?.email === "string" ? body.email.trim() : "";
+  const requesterEmail = emailRaw || null;
 
   const attachmentUrls = Array.isArray(body?.attachmentUrls)
     ? body.attachmentUrls.map((u: any) => String(u).trim()).filter(Boolean).slice(0, 5)
     : [];
 
   if (!subject) return bad("subject required");
+  const MAX_MESSAGE_LENGTH = 2000;
+  const MIN_MESSAGE_LENGTH = 10;
+  
   if (!message) return bad("message required");
+  if (message.length < MIN_MESSAGE_LENGTH)
+    return bad(`Message must be at least ${MIN_MESSAGE_LENGTH} characters.`);
+  if (message.length > MAX_MESSAGE_LENGTH)
+    return bad(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters.`);
 
   const allowed = new Set(["ACCOUNT_ROLE", "PAYMENTS", "DISPUTE", "TECHNICAL", "OTHER"]);
   if (!allowed.has(category)) return bad("Invalid category");
 
-  if (projectId) {
+  // Guests must supply an email so support can reply
+  if (!userId) {
+    if (!requesterEmail) return bad("Email is required so support can reply.", 400);
+    if (!isValidEmail(requesterEmail)) return bad("Please enter a valid email.", 400);
+  }
+
+  // Attachments are more sensitive: require auth + projectId + authorization
+  if (attachmentUrls.length > 0) {
+    if (!userId) return bad("Please sign in to attach images for security.", 401);
+    if (!projectId) return bad("Project ID is required for attachments.", 400);
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true, customerId: true, dressmakerId: true },
     });
     if (!project) return bad("Project not found", 404);
 
-    const isAdmin = session.user.role === "ADMIN";
+    const isAdmin = session?.user?.role === "ADMIN";
     const isParty = project.customerId === userId || project.dressmakerId === userId;
     if (!isParty && !isAdmin) return bad("Forbidden", 403);
+  } else {
+    // If projectId provided, keep your existing access check for logged-in users
+    if (projectId && userId) {
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, customerId: true, dressmakerId: true },
+      });
+      if (!project) return bad("Project not found", 404);
+
+      const isAdmin = session?.user?.role === "ADMIN";
+      const isParty = project.customerId === userId || project.dressmakerId === userId;
+      if (!isParty && !isAdmin) return bad("Forbidden", 403);
+    }
   }
 
   const ticket = await prisma.supportTicket.create({
     data: {
-      userId,
+      userId, // null for guests
+      requesterEmail, // email for guests; fine to store for logged-in too
       projectId: projectId || null,
       category,
       subject,

@@ -1,28 +1,29 @@
-import { requireUser } from "@/lib/requiredRole";
-import { DashboardShell } from "@/app/dashboard/DashboardShell";
+import { Container } from "@/components/ui/Container";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import SupportForm from "./support-form";
 
-export default async function SupportPage() {
-  await requireUser();
-
+export default function SupportPage() {
   return (
-    <DashboardShell
-      title="Contact support"
-      subtitle="Need help with your account, role, payments, or a project? Send a message to support."
-      tabs={[
-        { label: "Dashboard", href: "/dashboard" },
-        { label: "Messages", href: "/messages" },
-      ]}
-    >
-      <div className="max-w-3xl">
-        <Card>
-          <CardHeader title="Support request" subtitle="We usually reply within 1–2 business days." />
-          <CardBody>
-            <SupportForm />
-          </CardBody>
-        </Card>
-      </div>
-    </DashboardShell>
+    <main className="py-10 sm:py-14">
+      <Container>
+        <div className="mx-auto w-full max-w-3xl px-1 sm:px-0">
+          <div className="mb-6 sm:mb-8 text-center">
+            <h1 className="text-[28px] font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">
+              Contact support
+            </h1>
+            <p className="mt-2 text-[15px] leading-6 text-[var(--muted)]">
+              Need help with your account, payments, or a project? Send a message and we’ll follow up.
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader title="Support request" subtitle="We usually reply within 1–2 business days." />
+            <CardBody>
+              <SupportForm />
+            </CardBody>
+          </Card>
+        </div>
+      </Container>
+    </main>
   );
 }

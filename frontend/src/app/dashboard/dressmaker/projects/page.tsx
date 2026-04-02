@@ -3,9 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { formatMoney } from "@/lib/money";
 
 export default async function DressmakerProjectsPage() {
   const session = await getServerSession(authOptions);
@@ -19,15 +19,6 @@ export default async function DressmakerProjectsPage() {
   });
 
   return (
-    <DashboardShell
-      title="Projects"
-      subtitle="Track requests, edit details, and send quotes."
-      tabs={[
-        { label: "Profile", href: "/dashboard/dressmaker/profile" },
-        { label: "Portfolio", href: "/dashboard/dressmaker/portfolio" },
-        { label: "Projects", href: "/dashboard/dressmaker/projects" },
-      ]}
-    >
       <div className="max-w-4xl">
         <Card>
           <CardHeader
@@ -48,7 +39,7 @@ export default async function DressmakerProjectsPage() {
                           <div className="mt-1 text-[13px] text-[var(--muted)]">Status: {p.status}</div>
                         </div>
                         <Badge tone="neutral">
-                          Quote: {p.quotedTotalAmount != null ? p.quotedTotalAmount : "—"} {p.currency}
+                          Quote: {formatMoney(p.quotedTotalAmount, p.currency)}
                         </Badge>
                       </div>
                     </div>
@@ -59,6 +50,5 @@ export default async function DressmakerProjectsPage() {
           </CardBody>
         </Card>
       </div>
-    </DashboardShell>
   );
 }

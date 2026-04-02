@@ -16,22 +16,13 @@ export default async function MeasurementsPage() {
   });
 
   return (
-    <DashboardShell
-      title="Measurements"
-      subtitle="Update anytime. Your latest entry is used for new projects."
-      tabs={[
-        { label: "Projects", href: "/dashboard/customer/projects" },
-        { label: "Measurements", href: "/dashboard/customer/measurements" },
-      ]}
-    >
       <div className="max-w-3xl">
         <Card>
-          <CardHeader title="Your measurements" subtitle="Use inches (in). If unsure, add a note at the end." />
+          <CardHeader title="Measurements" subtitle="Use centimeter (cm)). If unsure, add a note at the end." />
           <CardBody>
             <MeasurementsForm initial={latest?.fieldsJson ?? null} />
           </CardBody>
         </Card>
       </div>
-    </DashboardShell>
   );
 }

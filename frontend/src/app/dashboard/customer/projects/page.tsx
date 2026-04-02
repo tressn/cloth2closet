@@ -8,6 +8,7 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { formatMoney } from "@/lib/money";
 
 export default async function CustomerProjectsPage() {
   const session = await getServerSession(authOptions);
@@ -20,14 +21,6 @@ export default async function CustomerProjectsPage() {
   });
 
   return (
-    <DashboardShell
-      title="My projects"
-      subtitle="View quotes, pay securely, and track progress."
-      tabs={[
-        { label: "Projects", href: "/dashboard/customer/projects" },
-        { label: "Measurements", href: "/dashboard/customer/measurements" },
-      ]}
-    >
       <div className="max-w-4xl">
         <Card>
           <CardHeader title="Projects" subtitle={`${projects.length} project${projects.length === 1 ? "" : "s"}`} />
@@ -45,7 +38,7 @@ export default async function CustomerProjectsPage() {
                       </div>
 
                       <Badge tone="neutral">
-                        Quote: {p.quotedTotalAmount ?? "—"} {p.currency}
+                        Quote: {formatMoney(p.quotedTotalAmount, p.currency)}
                       </Badge>
                     </div>
 
@@ -73,6 +66,5 @@ export default async function CustomerProjectsPage() {
           </CardBody>
         </Card>
       </div>
-    </DashboardShell>
   );
 }

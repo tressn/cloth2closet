@@ -182,7 +182,7 @@ export default async function FeedPage() {
                     <div className="aspect-[16/9] w-full bg-[var(--surface-2)]">
                       {item.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-contain object-center" />
                       ) : null}
                     </div>
 

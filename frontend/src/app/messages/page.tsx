@@ -20,7 +20,10 @@ export default async function MessagesPage() {
       project: true,
       customer: { select: { id: true, name: true, email: true } },
       dressmaker: { select: { id: true, name: true, email: true } },
-      messages: { take: 1, orderBy: { createdAt: "desc" } },
+      messages: { take: 1, 
+        orderBy: { createdAt: "desc" }, 
+        include: { files: { select: { url: true, purpose: true } } },
+      },
       conversationReads: {
         where: { userId },
         take: 1,
@@ -43,7 +46,9 @@ export default async function MessagesPage() {
             {convos.map((c) => {
               const last = c.messages[0];
               const lastText = previewText(last?.text);
-              const photoCount = Array.isArray(last?.attachments) ? last!.attachments.length : 0;
+              const photoCount =
+                last?.files?.filter((f: any) => f.purpose === "MESSAGE_ATTACHMENT").length
+                ?? (Array.isArray((last as any)?.attachments) ? (last as any).attachments.length : 0);
 
               const read = c.conversationReads[0]?.lastReadAt ?? null;
               const lastAt = last?.createdAt ?? c.updatedAt;
@@ -61,11 +66,9 @@ export default async function MessagesPage() {
                           {c.project?.projectCode ?? otherName}
                         </div>
                         <div className="mt-1 truncate text-[13px] text-[var(--muted)]">
-                          With: {otherName}
                         </div>
 
                         <div className="mt-2 text-[13px] text-[var(--muted)]">
-                          Last:{" "}
                           {lastText
                             ? lastText
                             : photoCount > 0

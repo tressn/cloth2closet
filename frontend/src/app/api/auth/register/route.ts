@@ -44,8 +44,8 @@ export async function POST(req: Request) {
     // Dressmaker required fields
     const displayName = (body.displayName ?? "").trim();
     const minimumBudget = body.minimumBudget; // dollars (UI)
-    const instagram = (body.instagram ?? "").trim();
-    const tiktok = (body.tiktok ?? "").trim();
+    const instagram = (body.instagramHandle ?? body.instagram ?? "").trim();
+    const tiktok = (body.tiktokHandle ?? body.tiktok ?? "").trim();
 
     if (role === "DRESSMAKER") {
       if (!displayName) return NextResponse.json({ error: "Display name is required." }, { status: 400 });
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
         },
       });
     } else {
-      const basePriceFrom = Math.round(minimumBudget * 100); // cents
+      const basePriceFrom = Math.round(minimumBudget);
 
       await prisma.user.create({
         data: {
@@ -102,7 +102,8 @@ export async function POST(req: Request) {
               countryCode, // ✅ stored here
               basePriceFrom, // ✅ store validated budget
               currency: "USD",
-              socialLinks: { instagram: instagram || null, tiktok: tiktok || null },
+              instagramHandle: instagram.trim().replace(/^@/, "") || null,
+              socialLinks: {tiktok: tiktok.trim().replace(/^@/, "") || null,},
               approvalStatus: "PENDING",
               isPublished: false,
             },

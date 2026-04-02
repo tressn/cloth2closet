@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 
 type UploadItem = {
@@ -46,50 +45,45 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
   const [ok, setOk] = useState(false);
 
   const photoUrls = useMemo(
-    () => uploads.filter((u) => u.status === "done" && u.publicUrl).map((u) => u.publicUrl!) ,
+    () => uploads.filter((u) => u.status === "done" && u.publicUrl).map((u) => u.publicUrl!),
     [uploads]
   );
 
   function onPickFiles(files: FileList | null) {
     if (!files) return;
 
-    const picked = Array.from(files);
-    const next: UploadItem[] = picked.map((f) => ({
-      file: f,
-      status: "queued",
-    }));
+    const MAX = 10;
+    const picked = Array.from(files).slice(0, MAX);
 
     setUploads((prev) => {
-      const combined = [...prev, ...next].slice(0, 8); // max 8 photos
-      return combined;
+      const next = [...prev, ...picked.map((f) => ({ file: f, status: "queued" as const }))].slice(0, MAX);
+      return next;
     });
   }
 
-  async function uploadAll() {
-    // upload queued items sequentially (simpler, safer for MVP)
-    for (let i = 0; i < uploads.length; i++) {
-      const item = uploads[i];
+  async function uploadAllQueued() {
+    const snapshot = uploads;
+
+    for (let i = 0; i < snapshot.length; i++) {
+      const item = snapshot[i];
       if (item.status !== "queued") continue;
 
-      setUploads((prev) =>
-        prev.map((u, idx) => (idx === i ? { ...u, status: "uploading", error: undefined } : u))
-      );
+      setUploads((prev) => prev.map((u, idx) => (idx === i ? { ...u, status: "uploading" } : u)));
 
       try {
         const { uploadUrl, publicUrl } = await presignReviewUpload(projectId, item.file);
         await putToS3(uploadUrl, item.file);
-
-        setUploads((prev) =>
-          prev.map((u, idx) => (idx === i ? { ...u, status: "done", publicUrl } : u))
-        );
+        setUploads((prev) => prev.map((u, idx) => (idx === i ? { ...u, status: "done", publicUrl } : u)));
       } catch (e: any) {
         setUploads((prev) =>
-          prev.map((u, idx) =>
-            idx === i ? { ...u, status: "error", error: e?.message ?? "Upload error" } : u
-          )
+          prev.map((u, idx) => (idx === i ? { ...u, status: "error", error: e?.message ?? "Upload error" } : u))
         );
       }
     }
+  }
+
+  function removeAt(idx: number) {
+    setUploads((prev) => prev.filter((_, i) => i !== idx));
   }
 
   async function submit() {
@@ -97,24 +91,19 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
     setLoading(true);
 
     try {
-      // Ensure any queued uploads are uploaded before review submit
-      const hasQueued = uploads.some((u) => u.status === "queued");
-      if (hasQueued) await uploadAll();
+      if (text.trim().length > 1500) throw new Error("Review is too long (max 1500 characters).");
 
-      const failed = uploads.some((u) => u.status === "error");
-      if (failed) {
+      if (uploads.some((u) => u.status === "queued")) {
+        await uploadAllQueued();
+      }
+      if (uploads.some((u) => u.status === "error")) {
         throw new Error("One or more photos failed to upload. Remove them or try again.");
       }
 
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          rating,
-          text,
-          photoUrls,
-        }),
+        body: JSON.stringify({ projectId, rating, text: text.trim(), photoUrls }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -126,10 +115,6 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
-  }
-
-  function removeAt(idx: number) {
-    setUploads((prev) => prev.filter((_, i) => i !== idx));
   }
 
   if (ok) {
@@ -145,33 +130,35 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
 
   return (
     <div className="grid gap-4">
-      <div>
-        <div className="text-[13px] text-[var(--muted)]">Rating (1–5)</div>
-        <Input
-          type="number"
-          min={1}
-          max={5}
+      <div className="grid gap-2">
+        <div className="text-[12px] font-medium text-[var(--muted)]">Rating</div>
+        <select
           value={rating}
           onChange={(e) => setRating(Number(e.target.value))}
-        />
+          className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[15px] text-[var(--text)]"
+        >
+          {[5, 4, 3, 2, 1].map((r) => (
+            <option key={r} value={r}>
+              {r} / 5
+            </option>
+          ))}
+        </select>
       </div>
 
-      <Textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="What was the experience like? (quality, communication, timeline)"
-      />
+      <div className="grid gap-2">
+        <div className="text-[12px] font-medium text-[var(--muted)]">Describe the experience (optional)</div>
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Quality, communication, timeline…"
+          maxLength={1500}
+        />
+        <div className="text-[12px] text-[var(--muted)]">{text.length}/1500</div>
+      </div>
 
       <div className="grid gap-2">
-        <div className="text-[13px] font-medium text-[var(--muted)]">
-          Photos (optional, up to 8)
-        </div>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={(e) => onPickFiles(e.target.files)}
-        />
+        <div className="text-[12px] font-medium text-[var(--muted)]">Photos (optional, up to 10)</div>
+        <input type="file" accept="image/*" multiple onChange={(e) => onPickFiles(e.target.files)} />
 
         {uploads.length ? (
           <div className="grid gap-2">
@@ -181,23 +168,16 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
                 className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-[13px] font-medium text-[var(--text)]">
-                    {u.file.name}
-                  </div>
+                  <div className="truncate text-[13px] font-medium text-[var(--text)]">{u.file.name}</div>
                   <div className="text-[12px] text-[var(--muted)]">
-                    {u.status === "queued" ? "Ready to upload" : null}
-                    {u.status === "uploading" ? "Uploading..." : null}
+                    {u.status === "queued" ? "Ready" : null}
+                    {u.status === "uploading" ? "Uploading…" : null}
                     {u.status === "done" ? "Uploaded" : null}
                     {u.status === "error" ? `Error: ${u.error ?? "Upload failed"}` : null}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {u.status === "queued" ? (
-                    <Button type="button" variant="secondary" onClick={uploadAll}>
-                      Upload
-                    </Button>
-                  ) : null}
                   <Button type="button" variant="secondary" onClick={() => removeAt(idx)}>
                     Remove
                   </Button>
@@ -211,11 +191,11 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
       {err ? <div className="text-[13px] text-[var(--danger)]">{err}</div> : null}
 
       <Button type="button" onClick={submit} disabled={loading} variant="primary">
-        {loading ? "Submitting..." : "Submit review"}
+        {loading ? "Submitting…" : "Submit review"}
       </Button>
 
       <div className="text-[12px] text-[var(--muted)]">
-        Your review is verified because it’s tied to a completed, paid project.
+        This review is verified when it’s tied to a completed project with settled final payment.
       </div>
     </div>
   );

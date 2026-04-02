@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
+import LabelMultiSelect from "@/components/labels/LabelMultiSelect";
 
 const ATTIRE_TYPES = [
   "DRESS",
@@ -22,12 +23,21 @@ const ATTIRE_TYPES = [
 
 type AttireType = (typeof ATTIRE_TYPES)[number];
 
+type SelectedLabel = {
+  id: string;
+  name: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+};
+
 export default function NewPortfolioItemForm() {
   const [title, setTitle] = useState("");
   const [attireType, setAttireType] = useState<AttireType>("OTHER");
-  const [tagsText, setTagsText] = useState("");
   const [description, setDescription] = useState("");
   const [isFeatured, setIsFeatured] = useState(false);
+
+  // ✅ NEW: labelIds instead of tagsText
+  const [selectedLabels, setSelectedLabels] = useState<SelectedLabel[]>([]);
+  const labelIds = selectedLabels.map((l) => l.id);
 
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -60,27 +70,38 @@ export default function NewPortfolioItemForm() {
       setSaving(true);
       setMessage(null);
 
-      const tags = tagsText.split(",").map((s) => s.trim()).filter(Boolean);
-
       setMessage(files.length ? "Uploading images…" : "Creating item…");
+
       const imageUrls: string[] = [];
-      for (const file of files) imageUrls.push(await uploadOne(file));
+      for (const file of files) {
+        imageUrls.push(await uploadOne(file));
+      }
 
       setMessage("Saving portfolio item…");
 
       const res = await fetch("/api/portfolio-items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, attireType, tags, description, isFeatured, imageUrls }),
+        body: JSON.stringify({
+          title,
+          attireType,
+          description,
+          isFeatured,
+          imageUrls,
+          labelIds,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? `Create failed (${res.status})`);
+      if (!res.ok) {
+        throw new Error(data?.error ?? `Create failed (${res.status})`);
+      }
 
       setMessage("Created! Refreshing…");
       window.location.reload();
     } catch (e: any) {
       setMessage(e?.message ?? "Something went wrong");
+    } finally {
       setSaving(false);
     }
   }
@@ -95,24 +116,38 @@ export default function NewPortfolioItemForm() {
         <Field label="Attire type">
           <Select value={attireType} onChange={(e) => setAttireType(e.target.value as AttireType)}>
             {ATTIRE_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t} value={t}>
+                {t}
+              </option>
             ))}
           </Select>
         </Field>
       </div>
 
-      <Field label="Tags" hint="Comma-separated keywords buyers search for.">
-        <Input value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="silk, bridal, embroidery" />
+      {/* ✅ NEW: Labels selector */}
+      <Field label="Tags" hint="Pick approved tags buyers search for. Dressmakers can also create new tags (pending approval).">
+        <LabelMultiSelect
+          scope="PORTFOLIO"
+          selectedLabels={selectedLabels}
+          onChange={setSelectedLabels}
+          allowCreate={true}
+          placeholder="Start typing to add tags…"
+        />
       </Field>
 
       <Field label="Description" hint="Optional. A short story reads premium.">
-        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Fabric, technique, fit notes…" />
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Fabric, technique, fit notes…"
+        />
       </Field>
 
       <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
         <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />
         <div className="text-[14px] text-[var(--text)]">
-          Mark as <span className="font-semibold">Featured</span> <span className="text-[var(--muted)]">(use sparingly)</span>
+          Mark as <span className="font-semibold">Featured</span>{" "}
+          <span className="text-[var(--muted)]">(use sparingly)</span>
         </div>
       </label>
 
@@ -139,15 +174,7 @@ export default function NewPortfolioItemForm() {
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="grid gap-2">
       <div className="text-[12px] font-medium text-[var(--muted)]">{label}</div>

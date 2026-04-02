@@ -363,6 +363,8 @@ model ProjectDetails {
   isRush      Boolean @default(false)
   wantsCalico Boolean @default(false)
 
+  dressmakerPrivateNotes String?
+
   // ✅ NEW: gates for workflow
   sketchSubmittedAt DateTime?
   sketchApprovedAt  DateTime?
@@ -772,9 +774,10 @@ model ProjectLabel {
 
 //support tickets
 model SupportTicket {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String  @id @default(cuid())
+  userId         String?
+  user           User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requesterEmail String? // required for guests
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)

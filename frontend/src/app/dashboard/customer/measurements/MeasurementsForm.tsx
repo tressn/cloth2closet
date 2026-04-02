@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
-import { MeasurementInfoIcon } from "@/components/measurements/MeasurementInfoIcon";
+
 
 export default function MeasurementsForm({ initial }: { initial: any | null }) {
   const [height, setHeight] = useState(initial?.heightCm ?? "");
@@ -61,49 +61,37 @@ export default function MeasurementsForm({ initial }: { initial: any | null }) {
     else setMsg("Saved!");
   }
 
-  function Field({ label, helpKey, children }: { label: string; helpKey?: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[12px] font-medium text-[var(--muted)]">{label}</div>
-        {helpKey ? <MeasurementInfoIcon fieldKey={helpKey} /> : null}
-      </div>
-      {children}
-    </label>
-  );
-  }
-
   return (
     <div className="grid gap-6">
       <Section title="Core">
         <Grid>
-          <Field label="Height (cm)" helpKey="heightCm"><Input value={height} onChange={(e) => setHeight(e.target.value)} /></Field>
-          <Field label="Bust (cm)" helpKey="bustCm"><Input value={bust} onChange={(e) => setBust(e.target.value)} /></Field>
-          <Field label="Waist (cm)" helpKey="waistCm"><Input value={waist} onChange={(e) => setWaist(e.target.value)} /></Field>
-          <Field label="Hips (cm)" helpKey="hipsCm"><Input value={hips} onChange={(e) => setHips(e.target.value)} /></Field>
+          <Field label="Height (cm)" ><Input value={height} onChange={(e) => setHeight(e.target.value)} /></Field>
+          <Field label="Bust (cm)" ><Input value={bust} onChange={(e) => setBust(e.target.value)} /></Field>
+          <Field label="Waist (cm)" ><Input value={waist} onChange={(e) => setWaist(e.target.value)} /></Field>
+          <Field label="Hips (cm)" ><Input value={hips} onChange={(e) => setHips(e.target.value)} /></Field>
         </Grid>
       </Section>
 
       <Section title="Torso & fit">
         <Grid>
-          <Field label="Shoulder → nipple (cm)" helpKey="shoulderToNippleCm"><Input value={shoulderToNipple} onChange={(e) => setShoulderToNipple(e.target.value)} /></Field>
-          <Field label="Shoulder → underbust (cm)" helpKey="shoulderToUnderbustCm"><Input value={shoulderToUnderbust} onChange={(e) => setShoulderToUnderbust(e.target.value)} /></Field>
-          <Field label="Shoulder → waist (cm)" helpKey="shoulderToWaistCm"><Input value={shoulderToWaist} onChange={(e) => setShoulderToWaist(e.target.value)} /></Field>
-          <Field label="Across back (cm)" helpKey="acrossBackCm"><Input value={acrossBack} onChange={(e) => setAcrossBack(e.target.value)} /></Field>
+          <Field label="Shoulder → nipple (cm)" ><Input value={shoulderToNipple} onChange={(e) => setShoulderToNipple(e.target.value)} /></Field>
+          <Field label="Shoulder → underbust (cm)" ><Input value={shoulderToUnderbust} onChange={(e) => setShoulderToUnderbust(e.target.value)} /></Field>
+          <Field label="Shoulder → waist (cm)" ><Input value={shoulderToWaist} onChange={(e) => setShoulderToWaist(e.target.value)} /></Field>
+          <Field label="Across back (cm)" ><Input value={acrossBack} onChange={(e) => setAcrossBack(e.target.value)} /></Field>
         </Grid>
 
         <Grid>
-          <Field label="Around belly button (cm)" helpKey="aroundBellyButtonCm"><Input value={aroundBellyButton} onChange={(e) => setAroundBellyButton(e.target.value)} /></Field>
-          <Field label="Around lower belly (cm)" helpKey="aroundLowerBellyCm"><Input value={aroundLowerBelly} onChange={(e) => setAroundLowerBelly(e.target.value)} /></Field>
+          <Field label="Around belly button (cm)" ><Input value={aroundBellyButton} onChange={(e) => setAroundBellyButton(e.target.value)} /></Field>
+          <Field label="Around lower belly (cm)" ><Input value={aroundLowerBelly} onChange={(e) => setAroundLowerBelly(e.target.value)} /></Field>
         </Grid>
       </Section>
 
       <Section title="Arms & length">
         <Grid>
-          <Field label="Around arm (cm)" helpKey="aroundArmCm"><Input value={aroundArm} onChange={(e) => setAroundArm(e.target.value)} /></Field>
-          <Field label="Sleeve length (cm)" helpKey="sleeveLengthCm"><Input value={sleeveLength} onChange={(e) => setSleeveLength(e.target.value)} /></Field>
-          <Field label="Shoulder → butt (cm)" helpKey="shoulderToButtCm"><Input value={shoulderToButt} onChange={(e) => setShoulderToButt(e.target.value)} /></Field>
-          <Field label="Full length (cm)" helpKey="fullLengthCm"><Input value={fullLength} onChange={(e) => setFullLength(e.target.value)} /></Field>
+          <Field label="Around arm (cm)" ><Input value={aroundArm} onChange={(e) => setAroundArm(e.target.value)} /></Field>
+          <Field label="Sleeve length (cm)" ><Input value={sleeveLength} onChange={(e) => setSleeveLength(e.target.value)} /></Field>
+          <Field label="Shoulder → butt (cm)" ><Input value={shoulderToButt} onChange={(e) => setShoulderToButt(e.target.value)} /></Field>
+          <Field label="Full length (cm)" ><Input value={fullLength} onChange={(e) => setFullLength(e.target.value)} /></Field>
         </Grid>
       </Section>
 

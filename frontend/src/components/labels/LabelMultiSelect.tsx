@@ -7,153 +7,183 @@ import { Button } from "@/components/ui/Button";
 
 type Scope = "PROJECT" | "PORTFOLIO" | "SPECIALTY";
 
-type Label = {
+export type PickerLabel = {
   id: string;
   name: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
-  scope: Scope;
+  scope?: Scope;
 };
 
 function normalizeName(name: string) {
   return name.trim().replace(/\s+/g, " ");
 }
 
+function slugify(name: string) {
+  return normalizeName(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
 export default function LabelMultiSelect(props: {
   scope: Scope;
-  valueIds: string[];                // selected label ids
-  valueNames?: string[];             // optional: selected label names (for immediate rendering)
-  onChange: (nextIds: string[], nextLabels: Array<{ id: string; name: string; status: Label["status"] }>) => void;
-
+  selectedLabels?: PickerLabel[];
+  onChange: (nextLabels: PickerLabel[]) => void;
   placeholder?: string;
   disabled?: boolean;
-  allowCreate?: boolean;             // default true
+  allowCreate?: boolean;
 }) {
-  const { scope, valueIds, onChange } = props;
+  const {
+    scope,
+    selectedLabels = [],
+    onChange,
+    placeholder = "Start typing to add tags…",
+    disabled,
+  } = props;
+
   const allowCreate = props.allowCreate ?? true;
 
-  const [all, setAll] = useState<Label[]>([]);
+  const [all, setAll] = useState<PickerLabel[]>([]);
   const [loading, setLoading] = useState(false);
-
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+
   const boxRef = useRef<HTMLDivElement | null>(null);
 
-  // Fetch approved labels for this scope
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetch(`/api/labels?scope=${scope}`, { cache: "no-store" })
+
+    fetch(`/api/labels?scope=${scope}&includePending=1`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (!alive) return;
-        setAll(Array.isArray(data?.labels) ? data.labels : []);
+
+        const labels = Array.isArray(data?.labels) ? data.labels : [];
+        setAll(
+          labels.sort((a: PickerLabel, b: PickerLabel) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+          )
+        );
       })
-      .finally(() => alive && setLoading(false));
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
     return () => {
       alive = false;
     };
   }, [scope]);
 
-  // Close on outside click
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!boxRef.current) return;
-      if (!boxRef.current.contains(e.target as Node)) setOpen(false);
+      if (!boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     }
+
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const selected = useMemo(() => {
-    const map = new Map(all.map((l) => [l.id, l] as const));
-    return valueIds
-      .map((id) => map.get(id))
-      .filter(Boolean) as Label[];
-  }, [all, valueIds]);
+  const selectedIds = useMemo(
+    () => new Set((selectedLabels ?? []).map((l) => l.id)),
+    [selectedLabels]
+    );
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
+
     const list = all
-      .filter((l) => l.status === "APPROVED" || l.status === "PENDING")
-      .filter((l) => !valueIds.includes(l.id));
-    if (!s) return list.slice(0, 12);
-    return list
-      .filter((l) => l.name.toLowerCase().includes(s))
-      .slice(0, 12);
-  }, [all, q, valueIds]);
+        .filter((l) => l.status === "APPROVED" || l.status === "PENDING")
+        .filter((l) => !selectedIds.has(l.id))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+    if (!s) return list;
+
+    return list.filter((l) => l.name.toLowerCase().includes(s));
+    }, [all, q, selectedIds]);
 
   const canCreate = useMemo(() => {
     if (!allowCreate) return false;
+
     const name = normalizeName(q);
     if (name.length < 2) return false;
-    const exists = all.some((l) => l.scope === scope && l.name.toLowerCase() === name.toLowerCase());
+
+    const nextSlug = slugify(name);
+
+    const exists = all.some((l) => slugify(l.name) === nextSlug);
     return !exists;
-  }, [allowCreate, q, all, scope]);
+  }, [allowCreate, q, all]);
 
-  async function addById(labelId: string) {
-    const label = all.find((x) => x.id === labelId);
-    if (!label) return;
+  function addLabel(label: PickerLabel) {
+    const nextMap = new Map(selectedLabels.map((x) => [x.id, x] as const));
+    nextMap.set(label.id, label);
 
-    const nextIds = Array.from(new Set([...valueIds, labelId]));
-    const nextLabels = [
-      ...selected.map((x) => ({ id: x.id, name: x.name, status: x.status })),
-      { id: label.id, name: label.name, status: label.status },
-    ];
-    onChange(nextIds, nextLabels);
+    onChange(Array.from(nextMap.values()));
     setQ("");
     setOpen(false);
-  }
+    }
 
-  function removeById(labelId: string) {
-    const nextIds = valueIds.filter((id) => id !== labelId);
-    const nextLabels = selected
-      .filter((x) => x.id !== labelId)
-      .map((x) => ({ id: x.id, name: x.name, status: x.status }));
-    onChange(nextIds, nextLabels);
+  function removeLabel(labelId: string) {
+    onChange(selectedLabels.filter((l) => l.id !== labelId));
   }
 
   async function createAndAttach() {
     const name = normalizeName(q);
     if (name.length < 2) return;
 
-    // Create PENDING label (your API supports this)
+    const existing = all.find((l) => slugify(l.name) === slugify(name));
+    if (existing) {
+        addLabel(existing);
+        return;
+    }
+
     const res = await fetch("/api/labels", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope, name }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, name }),
     });
+
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error ?? "Failed to create label");
+    if (!res.ok) {
+        throw new Error(data?.error ?? "Failed to create label");
+    }
 
-    const label: Label = data?.label;
-    if (!label?.id) throw new Error("Label creation returned no id");
+    const label = data?.label as PickerLabel | undefined;
+    if (!label?.id) {
+        throw new Error("Label creation returned no id");
+    }
 
-    // Put it in local list so it shows up immediately
     setAll((prev) => {
-      const exists = prev.some((x) => x.id === label.id);
-      return exists ? prev : [label, ...prev];
+        const map = new Map(prev.map((x) => [x.id, x] as const));
+        map.set(label.id, label);
+
+        return Array.from(map.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        );
     });
 
-    await addById(label.id);
-  }
+    addLabel(label);
+    }
 
   return (
     <div ref={boxRef} className="grid gap-2">
-      {/* Selected badges */}
-      {selected.length ? (
+      {selectedLabels.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {selected.map((l) => (
-            <span key={l.id} className="inline-flex items-center gap-2">
-              <Badge tone={l.status === "APPROVED" ? "neutral" : "featured"}>
-                {l.name}
-                {l.status !== "APPROVED" ? " (pending)" : ""}
+          {selectedLabels.map((label) => (
+            <span key={label.id} className="inline-flex items-center gap-2">
+              <Badge tone={label.status === "APPROVED" ? "neutral" : "featured"}>
+                {label.name}
+                {label.status !== "APPROVED" ? " (pending)" : ""}
               </Badge>
               <button
                 type="button"
                 className="text-[12px] text-[var(--muted)] hover:text-[var(--text)]"
-                onClick={() => removeById(l.id)}
-                disabled={props.disabled}
-                aria-label={`Remove ${l.name}`}
+                onClick={() => removeLabel(label.id)}
+                disabled={disabled}
+                aria-label={`Remove ${label.name}`}
               >
                 ✕
               </button>
@@ -162,7 +192,6 @@ export default function LabelMultiSelect(props: {
         </div>
       ) : null}
 
-      {/* Input + dropdown */}
       <div className="relative">
         <Input
           value={q}
@@ -171,34 +200,48 @@ export default function LabelMultiSelect(props: {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder={props.placeholder ?? (loading ? "Loading…" : "Start typing to search tags…")}
-          disabled={props.disabled}
+          placeholder={placeholder}
+          disabled={disabled}
         />
 
         {open ? (
-          <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
-            {filtered.length === 0 && !canCreate ? (
+          <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+            {loading ? (
+              <div className="px-4 py-3 text-[13px] text-[var(--muted)]">
+                Loading tags…
+              </div>
+            ) : null}
+
+            {!loading && filtered.length === 0 && !canCreate ? (
               <div className="px-4 py-3 text-[13px] text-[var(--muted)]">
                 No matches.
               </div>
             ) : null}
 
-            {filtered.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-[14px] hover:bg-[var(--surface-2)]"
-                onClick={() => addById(l.id)}
-                disabled={props.disabled}
-              >
-                <span className="text-[var(--text)]">{l.name}</span>
-                <span className="text-[12px] text-[var(--muted)]">{l.status === "APPROVED" ? "approved" : "pending"}</span>
-              </button>
-            ))}
+            {!loading &&
+              filtered.map((label) => (
+                <button
+                  key={label.id}
+                  type="button"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-[14px] hover:bg-[var(--surface-2)]"
+                  onClick={() => addLabel(label)}
+                  disabled={disabled}
+                >
+                  <span className="text-[var(--text)]">{label.name}</span>
+                  <span className="text-[12px] text-[var(--muted)]">
+                    {label.status === "APPROVED" ? "approved" : "pending"}
+                  </span>
+                </button>
+              ))}
 
             {canCreate ? (
               <div className="border-t border-[var(--border)] px-4 py-3">
-                <Button type="button" variant="secondary" onClick={createAndAttach} disabled={props.disabled}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={createAndAttach}
+                  disabled={disabled}
+                >
                   Create “{normalizeName(q)}” (pending)
                 </Button>
               </div>

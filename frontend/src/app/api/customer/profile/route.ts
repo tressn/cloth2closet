@@ -1,34 +1,60 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { COUNTRY_SET } from "@/lib/lookup/countries";
-import { SUBDIVISIONS_BY_COUNTRY } from "@/lib/lookup/subdivisions";
-import { TIMEZONES } from "@/lib/lookup/timezones";
+import { SUBDIVISION_SET_BY_COUNTRY } from "@/lib/lookup/subdivisions";
+import { TIMEZONE_SET } from "@/lib/lookup/timezones";
+
+type PatchBody = Partial<{
+  username: string;
+  name: string;
+  fullName: string;
+  phone: string;
+  timezoneIana: string;
+  address1: string;
+  address2: string;
+  postalCode: string;
+  countryCode: string;
+  subdivisionCode: string;
+}>;
+
+const asTrimmedString = (v: unknown): string | null => {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t.length ? t : "";
+};
 
 export async function PATCH(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const userId = session.user.id;
-  const body = await req.json().catch(() => ({}));
 
-  const username = typeof body.username === "string" ? body.username.trim() : "";
-  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const body: PatchBody = await req.json().catch(() => ({}));
 
-  const countryCode =
-    typeof body.countryCode === "string" ? body.countryCode.trim().toUpperCase() : "";
+  // Normalize inputs
+  const username = asTrimmedString(body.username);
+  const name = asTrimmedString(body.name);
+  const fullName = asTrimmedString(body.fullName);
+  const phone = asTrimmedString(body.phone);
+  const timezoneIana = asTrimmedString(body.timezoneIana);
+  const address1 = asTrimmedString(body.address1);
+  const address2 = asTrimmedString(body.address2);
+  const postalCode = asTrimmedString(body.postalCode);
 
-  const subdivisionCode =
-    typeof body.subdivisionCode === "string" ? body.subdivisionCode.trim().toUpperCase() : "";
+  const countryCodeRaw = asTrimmedString(body.countryCode);
+  const subdivisionCodeRaw = asTrimmedString(body.subdivisionCode);
 
-  const timezoneIana =
-    typeof body.timezoneIana === "string" ? body.timezoneIana.trim() : "";
+  const countryCode = countryCodeRaw ? countryCodeRaw.toUpperCase() : "";
+  const subdivisionCode = subdivisionCodeRaw ? subdivisionCodeRaw.toUpperCase() : "";
 
-
-  if (timezoneIana && !TIMEZONES.has(timezoneIana)) {
-    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
-  }
+  // ✅ timezone validation
+  if (timezoneIana && !TIMEZONE_SET.some((t) => t.value === timezoneIana)) {
+  return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+}
 
   // ✅ country validation
   if (countryCode && !COUNTRY_SET.has(countryCode)) {
@@ -38,9 +64,12 @@ export async function PATCH(req: Request) {
   // ✅ subdivision validation (only if provided)
   if (subdivisionCode) {
     if (!countryCode) {
-      return NextResponse.json({ error: "Country is required when selecting a state/province" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Country is required when selecting a state/province" },
+        { status: 400 }
+      );
     }
-    const set = SUBDIVISIONS_BY_COUNTRY[countryCode];
+    const set = SUBDIVISION_SET_BY_COUNTRY[countryCode];
     if (!set || !set.has(subdivisionCode)) {
       return NextResponse.json(
         { error: "Invalid state/province for selected country" },
@@ -49,48 +78,49 @@ export async function PATCH(req: Request) {
     }
   }
 
-  try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        username: username || null,
-        name: name || null,
-      },
-    });
+  // Build PATCH updates without accidentally blanking things
+  const userUpdate: Record<string, any> = {};
+  if (body.username !== undefined) userUpdate.username = username || null;
+  if (body.name !== undefined) userUpdate.name = name || null;
 
+  const profileData: Record<string, any> = {};
+  if (body.fullName !== undefined) profileData.fullName = fullName || null;
+  if (body.phone !== undefined) profileData.phone = phone || null;
+  if (body.timezoneIana !== undefined) profileData.timezoneIana = timezoneIana || null;
+  if (body.address1 !== undefined) profileData.address1 = address1 || null;
+  if (body.address2 !== undefined) profileData.address2 = address2 || null;
+  if (body.postalCode !== undefined) profileData.postalCode = postalCode || null;
+  if (body.countryCode !== undefined) profileData.countryCode = countryCode || null;
+  if (body.subdivisionCode !== undefined) profileData.subdivisionCode = subdivisionCode || null;
+
+  try {
+    // Only hit User table if relevant fields were in the PATCH
+    if (Object.keys(userUpdate).length) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: userUpdate,
+      });
+    }
+
+    // Upsert profile (create uses same normalized fields)
     await prisma.customerProfile.upsert({
       where: { userId },
       create: {
         userId,
-        fullName: typeof body.fullName === "string" ? body.fullName.trim() || null : null,
-        phone: typeof body.phone === "string" ? body.phone.trim() || null : null,
-
-        timezoneIana: timezoneIana || null,
-
-        address1: typeof body.address1 === "string" ? body.address1.trim() || null : null,
-        address2: typeof body.address2 === "string" ? body.address2.trim() || null : null,
-        postalCode: typeof body.postalCode === "string" ? body.postalCode.trim() || null : null,
-
-        countryCode: countryCode || null,
-        subdivisionCode: subdivisionCode || null,
+        fullName: profileData.fullName ?? null,
+        phone: profileData.phone ?? null,
+        timezoneIana: profileData.timezoneIana ?? null,
+        address1: profileData.address1 ?? null,
+        address2: profileData.address2 ?? null,
+        postalCode: profileData.postalCode ?? null,
+        countryCode: profileData.countryCode ?? null,
+        subdivisionCode: profileData.subdivisionCode ?? null,
       },
-      update: {
-        fullName: typeof body.fullName === "string" ? body.fullName.trim() || null : null,
-        phone: typeof body.phone === "string" ? body.phone.trim() || null : null,
-
-        timezoneIana: timezoneIana || null,
-
-        address1: typeof body.address1 === "string" ? body.address1.trim() || null : null,
-        address2: typeof body.address2 === "string" ? body.address2.trim() || null : null,
-        postalCode: typeof body.postalCode === "string" ? body.postalCode.trim() || null : null,
-
-        countryCode: countryCode || null,
-        subdivisionCode: subdivisionCode || null,
-      },
+      update: profileData,
     });
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? "Server error" }, { status: 500 });
+    return NextResponse.json({ error: e?.message ?? "Server error" }, { status: 500 });
   }
 }

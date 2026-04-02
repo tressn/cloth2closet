@@ -4,14 +4,8 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import ReleaseButton from "./release-button";
+import { formatMoney } from "@/lib/money";
 
-function money(amount: number, currency: string) {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
-  } catch {
-    return `${currency} ${amount}`;
-  }
-}
 
 export default async function AdminPayoutsPage() {
   await requireRole(["ADMIN"]);
@@ -85,7 +79,7 @@ export default async function AdminPayoutsPage() {
                           </td>
 
                           <td className="py-3 pr-4 font-semibold text-[var(--text)]">
-                            {money(m.amount, m.project.currency)}
+                            {formatMoney(m.amount, m.project.currency)}
                           </td>
 
                           <td className="py-3 pr-4">

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 
 type Role = "CUSTOMER" | "DRESSMAKER";
+type Opt = { value: string; label: string };
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,13 +21,35 @@ export default function RegisterPage() {
 
   // dressmaker fields
   const [displayName, setDisplayName] = useState("");
-  const [location, setLocation] = useState("");
-  const [minimumBudget, setMinimumBudget] = useState<number>(200);
+  const [countryCode, setCountryCode] = useState(""); // ✅ ISO alpha-2
+  const [minimumBudget, setMinimumBudget] = useState<number>(100);
   const [instagram, setInstagram] = useState("");
   const [tiktok, setTiktok] = useState("");
 
+  const [countries, setCountries] = useState<Opt[]>([]);
+
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Load countries once
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch("/api/lookups/countries", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        setCountries(Array.isArray(data) ? data : []);
+      } catch {
+        // keep silent; registration can still work without list if you want
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submit() {
     setErr(null);
@@ -40,7 +64,7 @@ export default function RegisterPage() {
 
     if (role === "DRESSMAKER") {
       payload.displayName = displayName;
-      payload.location = location;
+      payload.countryCode = countryCode; // ✅ send correct key
       payload.minimumBudget = minimumBudget;
       payload.instagram = instagram;
       payload.tiktok = tiktok;
@@ -102,20 +126,51 @@ export default function RegisterPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                 />
-                <Input placeholder="Password (min 10 chars)" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input
+                  placeholder="Password (min 10 chars)"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
 
                 {role === "DRESSMAKER" ? (
                   <div className="mt-2 grid gap-3">
-                    <Input placeholder="Display name (required)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-                    <Input placeholder="Location (required)" value={location} onChange={(e) => setLocation(e.target.value)} />
+                    <Input
+                      placeholder="Display name (required)"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                    />
+
+                    <Select
+                      value={countryCode}
+                      onChange={(e: any) => setCountryCode(e.target.value)}
+                    >
+                      <option value="">Home Country (required)</option>
+                      {countries.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </Select>
+                    <div className="text-[13px] text-[var(--muted)]">
+                      Minimum Budget
+                    </div>
                     <Input
                       placeholder="Minimum budget in USD (required)"
                       type="number"
                       value={minimumBudget}
                       onChange={(e) => setMinimumBudget(Number(e.target.value))}
                     />
-                    <Input placeholder="Instagram (required if no TikTok)" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-                    <Input placeholder="TikTok (required if no Instagram)" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
+                    <Input
+                      placeholder="Instagram (required if no TikTok)"
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                    />
+                    <Input
+                      placeholder="TikTok (required if no Instagram)"
+                      value={tiktok}
+                      onChange={(e) => setTiktok(e.target.value)}
+                    />
 
                     <div className="text-[13px] text-[var(--muted)]">
                       After signup, an admin must approve your dressmaker profile before you appear in search.
@@ -129,7 +184,13 @@ export default function RegisterPage() {
 
                 {err ? <div className="text-[13px] text-[var(--danger)]">{err}</div> : null}
 
-                <Button type="button" onClick={submit} disabled={loading} variant="primary" className="w-full">
+                <Button
+                  type="button"
+                  onClick={submit}
+                  disabled={loading}
+                  variant="primary"
+                  className="w-full"
+                >
                   {loading ? "Creating..." : "Create account"}
                 </Button>
 

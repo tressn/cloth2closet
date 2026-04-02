@@ -7,8 +7,10 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import ProjectProgress from "@/app/components/projects/ProjectProgress";
+import ProjectProgress from "@/components/projects/ProjectProgress";
 import PayMilestoneButton from "./PayMilestoneButton";
+import ApproveSketchButton from "./ApproveSketchButton";
+import { formatMoney } from "@/lib/money";
 
 function milestoneLabel(status?: string | null) {
   if (!status) return "Not started";
@@ -97,7 +99,7 @@ export default async function CustomerProjectDetailPage({
               Quote:{" "}
               <span className="font-semibold text-[var(--text)]">
                 {project.quotedTotalAmount != null
-                  ? `${project.quotedTotalAmount} ${project.currency}`
+                  ? formatMoney(project.quotedTotalAmount, project.currency)
                   : "Not quoted yet"}
               </span>
             </div>
@@ -111,7 +113,7 @@ export default async function CustomerProjectDetailPage({
                 </span>
                 {deposit?.amount != null ? (
                   <span className="ml-2 text-[13px] text-[var(--muted)]">
-                    ({deposit.amount} {project.currency})
+                    ({formatMoney(deposit.amount, project.currency)})
                   </span>
                 ) : null}
               </div>
@@ -123,7 +125,7 @@ export default async function CustomerProjectDetailPage({
                 </span>
                 {final?.amount != null ? (
                   <span className="ml-2 text-[13px] text-[var(--muted)]">
-                    ({final.amount} {project.currency})
+                    ({formatMoney(final.amount, project.currency)})
                   </span>
                 ) : null}
               </div>
@@ -169,11 +171,101 @@ export default async function CustomerProjectDetailPage({
         </Card>
 
         <Card>
-          <CardHeader title="Details" subtitle="This is where you can later show details + attachments." />
-          <CardBody>
-            <div className="text-[14px] text-[var(--muted)]">
-              Next step: render `project.details` fields in a clean, read-only panel for customers.
+          <CardHeader title="Details" subtitle="Key info for quoting + fit." />
+          <CardBody className="space-y-3 text-[14px] text-[var(--muted)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-semibold text-[var(--text)]">Measurements</div>
+                <div className="text-[13px] text-[var(--muted)]">
+                  Keep your latest sizes up to date for better fit.
+                </div>
+              </div>
+              <Link href="/dashboard/customer/measurements" className="inline-flex">
+                <Button variant="secondary">View</Button>
+              </Link>
             </div>
+
+            <div className="border-t border-[var(--border)] pt-3">
+              <div className="font-semibold text-[var(--text)]">Project notes</div>
+              <div className="text-[13px] text-[var(--muted)] whitespace-pre-wrap">
+                {(project.details as any)?.customerNotes
+                  ?? (project.details as any)?.notes
+                  ?? "No notes yet."}
+              </div>
+            </div>
+
+            <div className="border-t border-[var(--border)] pt-3">
+              <div className="font-semibold text-[var(--text)]">Key dates</div>
+              <div className="text-[13px]">
+                Final submitted:{" "}
+                <span className="font-semibold text-[var(--text)]">
+                  {(project.details as any)?.finalSubmittedAt
+                    ? new Date((project.details as any).finalSubmittedAt).toLocaleString()
+                    : "—"}
+                </span>
+              </div>
+            </div>
+            {project.details?.requireSketch ? (
+              <div className="border-t border-[var(--border)] pt-3">
+                <div className="font-semibold text-[var(--text)]">Sketch</div>
+
+                {project.details?.sketchImage?.length ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {project.details.sketchImage.map((url, idx) => (
+                        <a
+                          key={`${url}-${idx}`}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt={`Sketch ${idx + 1}`}
+                            className="w-full object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+
+                    <div className="text-[13px] text-[var(--muted)]">
+                      {project.details.sketchSubmittedAt
+                        ? `Submitted ${new Date(project.details.sketchSubmittedAt).toLocaleString()}`
+                        : "Submitted"}
+                      {project.details.sketchApprovedAt
+                        ? ` • Approved ${new Date(project.details.sketchApprovedAt).toLocaleString()}`
+                        : ""}
+                    </div>
+
+                    {!project.details.sketchApprovedAt &&
+                    project.details.sketchSubmittedAt &&
+                    project.details.sketchImage.length > 0 ? (
+                      <div className="pt-1">
+                        <ApproveSketchButton projectId={project.id} />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[13px] text-[var(--muted)]">
+                    No sketch submitted yet.
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {project.projectShipping ? (
+              <div className="border-t border-[var(--border)] pt-3">
+                <div className="font-semibold text-[var(--text)]">Shipping</div>
+                <div className="text-[13px]">
+                  Carrier:{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {project.projectShipping.carrier?.name ?? "—"}
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </CardBody>
         </Card>
       </div>

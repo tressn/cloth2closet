@@ -1,3 +1,5 @@
+import { formatMoney } from "@/lib/money";
+
 type QuoteItem = {
   id: string;
   projectCode: string;
@@ -19,19 +21,35 @@ export default function MyQuotes({ items }: { items: QuoteItem[] }) {
       ) : (
         <div className="mt-4 grid gap-3">
           {items.map((q) => (
-            <a key={q.id} href={`/dashboard/customer/projects/${q.id}`} className="rounded-xl border p-3 block hover:opacity-90">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">Project {q.projectCode}</div>
-                <div className="text-sm opacity-80">{q.status}</div>
+            <a
+              key={q.id}
+              href={`/dashboard/customer/projects/${q.id}`}
+              className="block min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 hover:bg-[var(--surface-2)]"
+            >
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="truncate text-[14px] font-semibold text-[var(--text)]">
+                    Project {q.projectCode}
+                  </div>
+                  <div className="mt-1 truncate text-[13px] text-[var(--muted)]">
+                    Dressmaker: {q.dressmaker.name ?? q.dressmaker.username ?? "Dressmaker"}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[12px] font-medium text-[var(--muted)]">
+                    {q.status}
+                  </span>
+                </div>
               </div>
-              <div className="mt-1 text-sm opacity-80">
-                Dressmaker: {q.dressmaker.name ?? q.dressmaker.username ?? "Dressmaker"}
-              </div>
-              <div className="mt-2">
-                <span className="font-semibold">
-                  {q.quotedTotalAmount ?? 0} {q.currency}
+
+              <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="text-[14px] font-semibold text-[var(--text)]">
+                  {formatMoney(q.quotedTotalAmount, q.currency)}
                 </span>
-                <span className="text-xs opacity-60"> • updated {new Date(q.updatedAt).toLocaleDateString()}</span>
+                <span className="text-[12px] text-[var(--muted)]">
+                  • updated {new Date(q.updatedAt).toLocaleDateString()}
+                </span>
               </div>
             </a>
           ))}

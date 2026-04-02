@@ -21,6 +21,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function isPastDate(value: string) {
+  if (!value) return false;
+
+  const selected = new Date(`${value}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return selected < today;
+}
+
 async function presignMessageUpload(conversationId: string, file: File) {
   const res = await fetch("/api/uploads/messages/presign", {
     method: "POST",
@@ -52,6 +62,7 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
   const [isRush, setIsRush] = useState(false);
   const [wantsCalico, setWantsCalico] = useState(false);
   const [notes, setNotes] = useState("");
+  const [requireSketch, setRequireSketch] = useState(false);
 
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,6 +72,8 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
     () => uploads.filter((u) => u.status === "done" && u.publicUrl).map((u) => u.publicUrl!),
     [uploads]
   );
+
+  const eventDateError = isPastDate(eventDate) ? "Event date can’t be in the past." : "";
 
   function onPickFiles(files: FileList | null) {
     if (!files) return;
@@ -109,6 +122,11 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
       return;
     }
 
+    if (eventDateError) {
+      setMsg(null);
+      return;
+    }
+
     setLoading(true);
     setMsg(null);
 
@@ -123,6 +141,7 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
           eventDate: eventDate || null,
           isRush,
           wantsCalico,
+          requireSketch,
           fabricNotes: cleanNotes,
         }),
       });
@@ -174,21 +193,34 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Field label="Event date (optional)">
-          <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+          <div className="grid gap-1">
+            <Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            {eventDateError ? (
+              <div className="text-[12px] text-[var(--danger)]">{eventDateError}</div>
+            ) : null}
+          </div>
         </Field>
 
         <div className="grid gap-2">
           <div className="text-[12px] font-medium text-[var(--muted)]">Options</div>
+
           <label className="flex items-center gap-2 text-[14px] text-[var(--text)]">
             <input type="checkbox" checked={isRush} onChange={(e) => setIsRush(e.target.checked)} />
             Rush job
           </label>
+
           <label className="flex items-center gap-2 text-[14px] text-[var(--text)]">
             <input type="checkbox" checked={wantsCalico} onChange={(e) => setWantsCalico(e.target.checked)} />
             Want a calico mockup
           </label>
+
+          <label className="flex items-center gap-2 text-[14px] text-[var(--text)]">
+            <input type="checkbox" checked={requireSketch} onChange={(e) => setRequireSketch(e.target.checked)} />
+            Require sketch approval
+          </label>
+
           <div className="text-[12px] text-[var(--muted)]">
-            Rush & calico affect pricing and timeline.
+            Rush, calico, and sketches affect pricing and timeline.
           </div>
         </div>
       </div>

@@ -33,7 +33,7 @@ export default async function CustomerQuotesPage() {
     <Container>
       <main className="py-10">
         <Card>
-          <CardHeader title="My Quotes" subtitle="Requests and approved quotes waiting for payment." />
+          <CardHeader title="Quotes" subtitle="Requests and approved quotes waiting for payment." />
           <CardBody>
             {quotes.length === 0 ? (
               <div className="text-[14px] text-[var(--muted)]">No quotes yet.</div>

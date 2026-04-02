@@ -37,13 +37,7 @@ export async function POST(req: Request) {
       customerId,
       dressmakerId: dressmakerUserId,
       projectId: null,
-      messages: {
-        create: {
-          senderId: customerId,
-          text: "Hi! I’m interested in your work.",
-          attachments: [],
-        },
-      },
+      messages: {},
     },
   })
 

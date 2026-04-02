@@ -415,7 +415,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         requireCustomer();
 
         if (project.status !== ProjectStatus.SHIPPED) throw new Error("Project must be SHIPPED first.");
-        if (!details.shippedAt) throw new Error("Missing shippedAt.");
 
         // Optional: enforce 14-day completion window
         const shippedAtValue = project.projectShipping?.shippedAt;

@@ -13,7 +13,11 @@ export function NavLink({
   hint?: string;
 }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname?.startsWith(href + "/");
+
+  const active =
+    href === "/dashboard"
+      ? pathname === "/dashboard" // ✅ exact match only for Home
+      : pathname === href || pathname?.startsWith(href + "/");
 
   return (
     <Link
