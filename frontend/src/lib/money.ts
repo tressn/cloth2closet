@@ -33,8 +33,11 @@ export function formatDisplayPrice(
 // form helpers (optional but good to keep together)
 export function dollarsInputToCents(input: string): number {
   const normalized = input.replace(/[^0-9.]/g, "");
+  if (!normalized) throw new Error("Invalid amount");
+
   const value = Number.parseFloat(normalized);
   if (!Number.isFinite(value)) throw new Error("Invalid amount");
+
   return Math.round(value * 100);
 }
 

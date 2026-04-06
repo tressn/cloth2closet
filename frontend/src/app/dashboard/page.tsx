@@ -10,12 +10,13 @@ function fmt(n: number) {
 }
 
 const ACTION_ROW =
-  "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between";
+  "flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4";
 
-const ACTION_TEXT = "min-w-0 text-[14px] text-[var(--muted)]";
+const ACTION_TEXT =
+  "min-w-0 flex-1 pr-1 text-[14px] leading-6 text-[var(--muted)]";
 
 const ACTION_BUTTON =
-  "shrink-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)]";
+  "inline-flex shrink-0 items-center justify-center self-start whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)]";
 
 export default async function DashboardHomePage() {
   const user = await requireUser();
@@ -228,6 +229,21 @@ export default async function DashboardHomePage() {
                   Update
                 </Link>
               </CardBody>
+            </Card>
+            <Card>
+                <CardHeader title="Reviews" subtitle="Help great makers stand out." />
+                <CardBody className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                    <div className="min-w-0 flex-1 text-[14px] leading-6 text-[var(--muted)]">
+                    Reviews to write:{" "}
+                    <span className="font-semibold text-[var(--text)]">{fmt(customerPendingReviews)}</span>
+                    </div>
+                    <Link
+                      href="/dashboard/customer/projects"
+                      className="inline-flex shrink-0 self-start whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)]"
+                    >
+                      View projects
+                    </Link>
+                </CardBody>
             </Card>
           </div>
         ) : null}

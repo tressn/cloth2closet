@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import LabelMultiSelect from "@/components/labels/LabelMultiSelect";
 
 type Opt = { value: string; label: string };
 
@@ -27,15 +28,20 @@ type Profile = {
   tiktokHandle: string | null;
 };
 
+type SelectedLabel = {
+  id: string;
+  slug: string;
+  name: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+};
+
 const CURRENCIES = ["USD", "CAD", "EUR", "GBP"] as const;
 
 export default function ProfileForm({ initialProfile }: { initialProfile: Profile }) {
   const [displayName, setDisplayName] = useState(initialProfile.displayName ?? "");
   const [bio, setBio] = useState(initialProfile.bio ?? "");
 
-  const [specialtiesText, setSpecialtiesText] = useState(
-    (initialProfile.specialties ?? []).join(", ")
-  );
+  const [selectedSpecialties, setSelectedSpecialties] = useState<SelectedLabel[]>([]);
 
   const [basePriceFrom, setBasePriceFrom] = useState(
     initialProfile.basePriceFrom != null ? String(initialProfile.basePriceFrom) : ""
@@ -58,6 +64,8 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
   const [timezones, setTimezones] = useState<Opt[]>([]);
   const [languages, setLanguages] = useState<Opt[]>([]);
 
+  
+
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -76,15 +84,34 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
 
     (async () => {
       try {
-        const [c, t, l] = await Promise.all([
+        const [c, t, l, specialtyRes] = await Promise.all([
           fetch("/api/lookups/countries", { cache: "no-store" }).then((r) => r.json()),
           fetch("/api/lookups/timezones", { cache: "no-store" }).then((r) => r.json()),
           fetch("/api/lookups/languages", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/labels?scope=SPECIALTY&includePending=1", { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (cancelled) return;
         setCountries(Array.isArray(c) ? c : []);
         setTimezones(Array.isArray(t) ? t : []);
         setLanguages(Array.isArray(l) ? l : []);
+
+        const specialtyLabels = Array.isArray(specialtyRes?.labels) ? specialtyRes.labels : [];
+
+        const byName = new Map(
+          specialtyLabels.map((label: any) => [String(label.name).toLowerCase(), label])
+        );
+
+        const initialSelected = (initialProfile.specialties ?? [])
+          .map((name) => byName.get(String(name).toLowerCase()))
+          .filter(Boolean)
+          .map((label: any) => ({
+            id: label.id,
+            slug: label.slug,
+            name: label.name,
+            status: label.status,
+          }));
+
+        setSelectedSpecialties(initialSelected);
       } catch {
         // ignore
       }
@@ -108,8 +135,6 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
     setSaving(true);
     setMessage(null);
 
-    const specialties = specialtiesText.split(",").map((s) => s.trim()).filter(Boolean);
-
     const parsedBasePrice = basePriceFrom.trim().length ? Number(basePriceFrom) : null;
     const parsedYears = yearsExperience.trim().length ? Number(yearsExperience) : null;
 
@@ -125,7 +150,7 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
         basePriceFrom: parsedBasePrice, // dollars
         currency,
         yearsExperience: parsedYears,
-        specialties,
+        specialtyIds: Array.from(new Set(selectedSpecialties.map((s) => s.id))),
         websiteUrl: websiteUrl.trim() || null,
         instagramHandle: instagramHandle.trim().replace(/^@/, "") || null,
         tiktokHandle: tiktokHandle.trim().replace(/^@/, "") || null,
@@ -219,14 +244,17 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
       {/* SECTION: Skills */}
       <Section title="Skills & Specialties" subtitle="Helps customers find you in search.">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Specialties" hint="Comma-separated (e.g. bridal, eveningwear, alterations).">
-            <Control>
-              <Input
-                value={specialtiesText}
-                onChange={(e) => setSpecialtiesText(e.target.value)}
-                placeholder="bridal, eveningwear, alterations"
-              />
-            </Control>
+          <Field
+            label="Specialties"
+            hint="Select approved specialties or create new ones. New specialties will appear as pending cards."
+          >
+            <LabelMultiSelect
+              scope="SPECIALTY"
+              selectedLabels={selectedSpecialties}
+              onChange={setSelectedSpecialties}
+              allowCreate={true}
+              placeholder="Start typing to add specialties…"
+            />
           </Field>
 
           <Field label="Website URL" hint="Optional. Include https://">

@@ -17,7 +17,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     include: { payment: true },
   });
 
-  if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!project) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   if (project.dressmakerId !== session.user.id && session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -55,7 +57,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const finalAmount = Math.max(1, total - depositAmount);
 
   const updated = await prisma.$transaction(async (tx) => {
-    // Update project “contract”
     const p = await tx.project.update({
       where: { id },
       data: {
@@ -66,10 +67,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     });
 
-    // Create/update milestones
     const depositMilestone = await tx.milestone.upsert({
       where: { projectId_type: { projectId: id, type: "DEPOSIT" } },
-      update: { amount: depositAmount, title: "Deposit", status: MilestoneStatus.INVOICED },
+      update: {
+        amount: depositAmount,
+        title: "Deposit",
+        status: MilestoneStatus.INVOICED,
+      },
       create: {
         projectId: id,
         type: "DEPOSIT",
@@ -81,7 +85,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const finalMilestone = await tx.milestone.upsert({
       where: { projectId_type: { projectId: id, type: "FINAL" } },
-      update: { amount: finalAmount, title: "Final payment", status: MilestoneStatus.PENDING },
+      update: {
+        amount: finalAmount,
+        title: "Final payment",
+        status: MilestoneStatus.PENDING,
+      },
       create: {
         projectId: id,
         type: "FINAL",
@@ -91,12 +99,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     });
 
-    // Optional: keep Payment as rollup summary (not used for checkout)
     const payment = project.payment
       ? await tx.payment.update({
           where: { id: project.payment.id },
           data: {
-            totalAmount: total, // store total rollup
+            totalAmount: total,
             currency,
             status: "REQUIRES_PAYMENT_METHOD",
           },
@@ -110,18 +117,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         });
 
-    return { project: p, depositMilestone, finalMilestone, payment };
-  });
+    const notificationHref = `/dashboard/customer/projects/${id}`;
 
-  await prisma.notification.create({
-    data: {
-      userId: project.customerId,
-      type: "QUOTE_APPROVED",
-      title: "Quote approved",
-      body: updated.project.title ?? project.projectCode,
-      href: "/dashboard/customer/quotes",
-      projectId: id,
-    },
+    await tx.notification.create({
+      data: {
+        userId: project.customerId,
+        type: "QUOTE_APPROVED",
+        title: "Quote ready",
+        body: p.title
+          ? `Your quote for ${p.title} is ready to review.`
+          : `Your quote for ${project.projectCode} is ready to review.`,
+        href: notificationHref,
+        projectId: id,
+      },
+    });
+
+    const conversation = await tx.conversation.upsert({
+      where: { projectId: id },
+      update: {},
+      create: {
+        customerId: project.customerId,
+        dressmakerId: project.dressmakerId,
+        projectId: id,
+        isGeneral: false,
+      },
+      select: { id: true },
+    });
+
+    await tx.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: project.dressmakerId,
+        text:
+          "Your quote is ready. Please review it on the project page and pay the deposit to continue.",
+        attachments: [],
+      },
+    });
+
+    return { project: p, depositMilestone, finalMilestone, payment };
   });
 
   return NextResponse.json({

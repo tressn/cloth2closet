@@ -25,6 +25,7 @@ type AttireType = (typeof ATTIRE_TYPES)[number];
 
 type SelectedLabel = {
   id: string;
+  slug: string;
   name: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
 };
@@ -37,7 +38,7 @@ export default function NewPortfolioItemForm() {
 
   // ✅ NEW: labelIds instead of tagsText
   const [selectedLabels, setSelectedLabels] = useState<SelectedLabel[]>([]);
-  const labelIds = selectedLabels.map((l) => l.id);
+  const labelIds = Array.from(new Set(selectedLabels.map((l) => l.id)));
 
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
@@ -174,12 +175,22 @@ export default function NewPortfolioItemForm() {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="grid gap-2">
+    <div className="grid gap-2">
       <div className="text-[12px] font-medium text-[var(--muted)]">{label}</div>
       {children}
-      {hint ? <div className="text-[12px] leading-5 text-[var(--muted)]">{hint}</div> : null}
-    </label>
+      {hint ? (
+        <div className="text-[12px] leading-5 text-[var(--muted)]">{hint}</div>
+      ) : null}
+    </div>
   );
 }

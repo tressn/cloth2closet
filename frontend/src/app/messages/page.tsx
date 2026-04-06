@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { requireUser } from "@/lib/requiredRole";
 import MessagesShell from "./MessagesShell";
+import { getConversationDisplayMeta } from "@/lib/conversationTitle";
 
 function previewText(text?: string | null) {
   const t = (text ?? "").trim();
@@ -55,7 +56,12 @@ export default async function MessagesPage() {
               const isNew = read ? lastAt > read : true; // never read => NEW
 
               const other = c.customerId === userId ? c.dressmaker : c.customer;
-              const otherName = other?.name || other?.email || "Conversation";
+              const display = getConversationDisplayMeta({
+                project: c.project,
+                customer: c.customer,
+                otherParticipant: other,
+                isProjectConversation: !!c.projectId,
+              });
 
               return (
                 <Link key={c.id} href={`/messages/${c.id}`} className="block">
@@ -63,10 +69,14 @@ export default async function MessagesPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="truncate text-[15px] font-semibold text-[var(--text)]">
-                          {c.project?.projectCode ?? otherName}
+                          {display.title}
                         </div>
-                        <div className="mt-1 truncate text-[13px] text-[var(--muted)]">
-                        </div>
+
+                        {display.subtitle ? (
+                          <div className="mt-1 truncate text-[12px] text-[var(--muted)]">
+                            {display.subtitle}
+                          </div>
+                        ) : null}
 
                         <div className="mt-2 text-[13px] text-[var(--muted)]">
                           {lastText

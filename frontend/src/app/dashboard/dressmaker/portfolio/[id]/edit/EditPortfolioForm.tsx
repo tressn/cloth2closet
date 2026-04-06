@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
@@ -29,6 +29,7 @@ type PendingUpload = {
 
 type SelectedLabel = {
   id: string;
+  slug: string;
   name: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
 };
@@ -76,13 +77,14 @@ export default function EditPortfolioForm({ item }: { item: any }) {
       .filter((l: any) => l.scope === "PORTFOLIO" && l.status !== "REJECTED")
       .map((l: any) => ({
         id: l.id,
+        slug: l.slug,
         name: l.name,
         status: l.status as SelectedLabel["status"],
       }))) as SelectedLabel[];
   }, [item]);
 
   const [selectedLabels, setSelectedLabels] = useState<SelectedLabel[]>(initialLabels ?? []);
-  const labelIds = (selectedLabels ?? []).map((l) => l.id);
+  const labelIds = Array.from(new Set((selectedLabels ?? []).map((l) => l.id)));
 
   const [description, setDescription] = useState(item.description ?? "");
   const [isFeatured, setIsFeatured] = useState(!!item.isFeatured);
@@ -124,9 +126,6 @@ export default function EditPortfolioForm({ item }: { item: any }) {
     setMessage(null);
   }
 
-  useEffect(() => {
-    setSelectedLabels(initialLabels ?? []);
-  }, [initialLabels]);
 
   function removeExistingImage(idx: number) {
     setImageUrls((prev) => prev.filter((_, i) => i !== idx));

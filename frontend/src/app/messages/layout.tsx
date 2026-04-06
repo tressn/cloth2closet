@@ -1,11 +1,9 @@
-import { Container } from "@/components/ui/Container";
-
 export default function MessagesLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-[var(--bg)]">
-      <Container>
-        <main className="py-10">{children}</main>
-      </Container>
+      <main className="mx-auto w-full max-w-[1600px] px-4 py-10 sm:px-6 lg:px-8">
+        {children}
+      </main>
     </div>
   );
 }

@@ -1,22 +1,41 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { RefObject, useEffect, useLayoutEffect } from "react";
 
-export default function AutoScrollToBottom() {
-  const ref = useRef<HTMLDivElement | null>(null);
+type Props = {
+  containerRef?: RefObject<HTMLElement | null>;
+};
 
-  useEffect(() => {
-    const scroll = () => {
-      ref.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-    };
+export default function AutoScrollToBottom({ containerRef }: Props) {
+  function scrollToBottom(behavior: ScrollBehavior = "auto") {
+    const el = containerRef?.current;
+    if (!el) return;
 
-    scroll();
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior,
+    });
+  }
 
-    const handler = () => scroll();
-    window.addEventListener("c2c:message-sent", handler);
+  useLayoutEffect(() => {
+    const id1 = requestAnimationFrame(() => {
+      const id2 = requestAnimationFrame(() => {
+        scrollToBottom("auto");
+      });
+      return () => cancelAnimationFrame(id2);
+    });
 
-    return () => window.removeEventListener("c2c:message-sent", handler);
+    return () => cancelAnimationFrame(id1);
   }, []);
 
-  return <div ref={ref} />;
+  useEffect(() => {
+    const onSent = () => {
+      requestAnimationFrame(() => scrollToBottom("smooth"));
+    };
+
+    window.addEventListener("c2c:message-sent", onSent);
+    return () => window.removeEventListener("c2c:message-sent", onSent);
+  }, []);
+
+  return null;
 }

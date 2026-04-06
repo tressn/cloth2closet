@@ -3,9 +3,15 @@
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { centsToInputValue, dollarsInputToCents } from "@/lib/money";
 
-function dollarsFromCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
+function formatDollars(amount: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 export default function QuoteForm({
@@ -15,11 +21,11 @@ export default function QuoteForm({
   existingDepositPercent,
 }: {
   projectId: string;
-  existingAmount: number | null; // full quote in cents
+  existingAmount: number | null;
   currency: string;
   existingDepositPercent?: number | null;
 }) {
-  const [amount, setAmount] = useState(existingAmount != null ? String(existingAmount) : "");
+  const [amountInput, setAmountInput] = useState(centsToInputValue(existingAmount));
   const [depositPercent, setDepositPercent] = useState(
     existingDepositPercent != null ? String(existingDepositPercent) : "50"
   );
@@ -27,32 +33,44 @@ export default function QuoteForm({
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const parsedAmount = useMemo(() => {
-    const n = Number(amount);
-    return Number.isFinite(n) ? Math.trunc(n) : NaN;
-  }, [amount]);
+  const amountDollars = useMemo(() => {
+    const normalized = amountInput.replace(/[^0-9.]/g, "");
+    const value = Number.parseFloat(normalized);
+    return Number.isFinite(value) && value > 0 ? value : NaN;
+  }, [amountInput]);
+
+  const amountInCents = useMemo(() => {
+    try {
+      if (!amountInput.trim()) return NaN;
+      return dollarsInputToCents(amountInput);
+    } catch {
+      return NaN;
+    }
+  }, [amountInput]);
 
   const parsedPercent = useMemo(() => {
     const n = Number(depositPercent);
     return Number.isFinite(n) ? Math.trunc(n) : NaN;
   }, [depositPercent]);
 
-  const depositAmount = useMemo(() => {
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) return null;
-    if (!Number.isFinite(parsedPercent)) return null;
-    return Math.max(1, Math.trunc((parsedAmount * parsedPercent) / 100));
-  }, [parsedAmount, parsedPercent]);
+  const percentOk =
+    Number.isFinite(parsedPercent) && parsedPercent >= 25 && parsedPercent <= 75;
 
-  const percentOk = Number.isFinite(parsedPercent) && parsedPercent >= 25 && parsedPercent <= 75;
+  const depositDollars = useMemo(() => {
+    if (!Number.isFinite(amountDollars) || amountDollars <= 0) return null;
+    if (!percentOk) return null;
+    return (amountDollars * parsedPercent) / 100;
+  }, [amountDollars, parsedPercent, percentOk]);
 
   async function submit() {
     setLoading(true);
     setMsg(null);
 
     try {
-      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-        throw new Error("Enter a valid total quote amount in cents.");
+      if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
+        throw new Error("Enter a valid quote amount.");
       }
+
       if (!percentOk) {
         throw new Error("Deposit percent must be between 25 and 75.");
       }
@@ -61,7 +79,7 @@ export default function QuoteForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          quotedTotalAmount: parsedAmount,
+          quotedTotalAmount: amountInCents,
           depositPercent: parsedPercent,
           currency,
         }),
@@ -79,30 +97,56 @@ export default function QuoteForm({
   }
 
   return (
-    <div className="grid gap-3 max-w-md">
+    <div className="grid max-w-md gap-4">
       <label className="grid gap-2">
-        <div className="text-[12px] font-medium text-[var(--muted)]">Total quote (cents)</div>
-        <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="50000" />
+        <div className="text-[12px] font-medium text-[var(--muted)]">
+          Total quote
+        </div>
+        <Input
+          value={amountInput}
+          onChange={(e) => setAmountInput(e.target.value)}
+          placeholder="1200.00"
+          inputMode="decimal"
+        />
         <div className="text-[12px] leading-5 text-[var(--muted)]">
-          Stored in cents. Example: 50000 = {dollarsFromCents(50000)}.
+          Enter the full amount the customer will see.
         </div>
       </label>
 
       <label className="grid gap-2">
-        <div className="text-[12px] font-medium text-[var(--muted)]">Deposit percent (25–75)</div>
-        <Input value={depositPercent} onChange={(e) => setDepositPercent(e.target.value)} placeholder="50" />
+        <div className="text-[12px] font-medium text-[var(--muted)]">
+          Deposit percent
+        </div>
+        <Input
+          value={depositPercent}
+          onChange={(e) => setDepositPercent(e.target.value)}
+          placeholder="50"
+          inputMode="numeric"
+        />
         <div className="text-[12px] leading-5 text-[var(--muted)]">
-          Customers pay the deposit now. Remaining balance can be handled later.
+          This is the portion the customer pays now.
         </div>
         {!percentOk ? (
-          <div className="text-[12px] text-[var(--danger)]">Deposit must be between 25% and 75%.</div>
+          <div className="text-[12px] text-[var(--danger)]">
+            Deposit must be between 25% and 75%.
+          </div>
         ) : null}
       </label>
 
-      {depositAmount != null && percentOk && Number.isFinite(parsedAmount) && parsedAmount > 0 ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[13px] text-[var(--muted)]">
-          Deposit due now: <span className="font-semibold text-[var(--text)]">{dollarsFromCents(depositAmount)}</span>{" "}
-          ({parsedPercent}% of {dollarsFromCents(parsedAmount)})
+      {depositDollars != null && Number.isFinite(amountDollars) && percentOk ? (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+          <div className="text-[12px] uppercase tracking-wide text-[var(--muted)]">
+            Payment preview
+          </div>
+          <div className="mt-2 text-[14px] text-[var(--text)]">
+            Customer pays now:{" "}
+            <span className="font-semibold">
+              {formatDollars(depositDollars, currency)}
+            </span>
+          </div>
+          <div className="mt-1 text-[13px] text-[var(--muted)]">
+            {parsedPercent}% of {formatDollars(amountDollars, currency)}
+          </div>
         </div>
       ) : null}
 
@@ -111,10 +155,10 @@ export default function QuoteForm({
         <Button
           type="button"
           onClick={submit}
-          disabled={loading || !amount.trim() || !depositPercent.trim() || !percentOk}
+          disabled={loading || !amountInput.trim() || !depositPercent.trim() || !percentOk}
           variant="primary"
         >
-          {loading ? "Saving…" : "Approve quote"}
+          {loading ? "Saving…" : "Save quote"}
         </Button>
       </div>
     </div>

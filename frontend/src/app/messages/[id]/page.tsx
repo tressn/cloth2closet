@@ -6,6 +6,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import MessageComposer from "./MessageComposer";
 import MessagesShell from "../MessagesShell";
 import AutoScrollToBottom from "./AutoScrollToBottom";
+import { getConversationDisplayMeta } from "@/lib/conversationTitle";
+import MessagesViewport from "./MessagesViewport";
 
 function AttachmentGallery({ urls, mine }: { urls: string[]; mine: boolean }) {
   const safe = Array.isArray(urls) ? urls.filter(Boolean).slice(0, 10) : [];
@@ -67,6 +69,8 @@ export default async function ConversationPage({
     where: { id },
     include: {
       project: true,
+      customer: { select: { id: true, name: true, email: true } },
+      dressmaker: { select: { id: true, name: true, email: true } },
       messages: {
         orderBy: { createdAt: "asc" },
         include: {
@@ -78,6 +82,24 @@ export default async function ConversationPage({
 
   if (!convo) notFound();
   if (convo.customerId !== userId && convo.dressmakerId !== userId) notFound();
+
+  const otherParticipant = convo.customerId === userId ? convo.dressmaker : convo.customer;
+
+  function displayName(user?: { name?: string | null; email?: string | null }) {
+    if (!user) return "Them";
+    if (user.name) return user.name;
+    if (user.email) return user.email.split("@")[0];
+    return "Them";
+  }
+
+  const otherName = displayName(otherParticipant);
+
+  const convoDisplay = getConversationDisplayMeta({
+    project: convo.project,
+    customer: convo.customer,
+    otherParticipant,
+    isProjectConversation: !!convo.projectId,
+  });
 
   // Mark as read (clears NEW badge)
   await prisma.conversationRead.upsert({
@@ -119,7 +141,13 @@ export default async function ConversationPage({
             const isNew = read ? lastAt > read : true;
 
             const other = c.customerId === userId ? c.dressmaker : c.customer;
-            const otherName = other?.name || other?.email || "Them";
+
+            const display = getConversationDisplayMeta({
+              project: c.project,
+              customer: c.customer,
+              otherParticipant: other,
+              isProjectConversation: !!c.projectId,
+            });
 
             const active = c.id === convo.id;
 
@@ -136,8 +164,14 @@ export default async function ConversationPage({
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="truncate text-[15px] font-semibold text-[var(--text)]">
-                        {c.project?.title ?? c.project?.projectCode ?? otherName}
+                        {display.title}
                       </div>
+
+                      {display.subtitle ? (
+                        <div className="mt-1 truncate text-[12px] text-[var(--muted)]">
+                          {display.subtitle}
+                        </div>
+                      ) : null}
                       <div className="mt-2 text-[13px] text-[var(--muted)]">
                         {lastText
                           ? lastText
@@ -172,8 +206,12 @@ export default async function ConversationPage({
   const detail = (
     <Card>
       <CardHeader
-        title={convo.project?.title ?? convo.project?.projectCode ?? "Conversation"}
-        subtitle="Messages are private between you and the other party."
+        title={convoDisplay.title}
+        subtitle={
+          convoDisplay.subtitle
+            ? `${convoDisplay.subtitle} • Messages are private between you and the other party.`
+            : "Messages are private between you and the other party."
+        }
       />
       <CardBody>
         <div className="space-y-3">
@@ -199,7 +237,13 @@ export default async function ConversationPage({
                   ].join(" ")}
                 >
                   <div className="text-[12px] opacity-80">
-                    {mine ? "You" : "Them"} • {new Date(m.createdAt).toLocaleString()}
+                    <div className="text-[12px] opacity-80">
+                      {mine ? "You" : otherName} •{" "}
+                      {new Date(m.createdAt).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </div>
                   </div>
 
                   {m.text ? (

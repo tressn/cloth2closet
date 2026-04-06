@@ -10,6 +10,7 @@ type Scope = "PROJECT" | "PORTFOLIO" | "SPECIALTY";
 export type PickerLabel = {
   id: string;
   name: string;
+  slug: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   scope?: Scope;
 };
@@ -23,6 +24,10 @@ function slugify(name: string) {
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-");
+}
+
+function labelKey(label: Pick<PickerLabel, "id" | "slug">) {
+  return label.slug || label.id;
 }
 
 export default function LabelMultiSelect(props: {
@@ -61,9 +66,14 @@ export default function LabelMultiSelect(props: {
 
         const labels = Array.isArray(data?.labels) ? data.labels : [];
         setAll(
-          labels.sort((a: PickerLabel, b: PickerLabel) =>
-            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-          )
+          labels.sort((a: PickerLabel, b: PickerLabel) => {
+            if (a.status !== b.status) {
+              return a.status === "APPROVED" ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name, undefined, {
+              sensitivity: "base",
+            });
+          })
         );
       })
       .finally(() => {
@@ -87,23 +97,22 @@ export default function LabelMultiSelect(props: {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const selectedIds = useMemo(
-    () => new Set((selectedLabels ?? []).map((l) => l.id)),
+  const selectedKeys = useMemo(
+    () => new Set((selectedLabels ?? []).map((l) => labelKey(l))),
     [selectedLabels]
-    );
+  );
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
 
     const list = all
-        .filter((l) => l.status === "APPROVED" || l.status === "PENDING")
-        .filter((l) => !selectedIds.has(l.id))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      .filter((l) => l.status === "APPROVED" || l.status === "PENDING")
+      .filter((l) => !selectedKeys.has(labelKey(l)));
 
     if (!s) return list;
 
     return list.filter((l) => l.name.toLowerCase().includes(s));
-    }, [all, q, selectedIds]);
+  }, [all, q, selectedKeys]);
 
   const canCreate = useMemo(() => {
     if (!allowCreate) return false;
@@ -112,81 +121,89 @@ export default function LabelMultiSelect(props: {
     if (name.length < 2) return false;
 
     const nextSlug = slugify(name);
+    const exists = all.some((l) => l.slug === nextSlug);
 
-    const exists = all.some((l) => slugify(l.name) === nextSlug);
     return !exists;
   }, [allowCreate, q, all]);
 
   function addLabel(label: PickerLabel) {
-    const nextMap = new Map(selectedLabels.map((x) => [x.id, x] as const));
-    nextMap.set(label.id, label);
+    const nextMap = new Map(selectedLabels.map((x) => [labelKey(x), x] as const));
+    nextMap.set(labelKey(label), label);
 
     onChange(Array.from(nextMap.values()));
     setQ("");
     setOpen(false);
-    }
+  }
 
-  function removeLabel(labelId: string) {
-    onChange(selectedLabels.filter((l) => l.id !== labelId));
+  function removeLabel(labelToRemove: PickerLabel) {
+    onChange(selectedLabels.filter((l) => labelKey(l) !== labelKey(labelToRemove)));
   }
 
   async function createAndAttach() {
     const name = normalizeName(q);
     if (name.length < 2) return;
 
-    const existing = all.find((l) => slugify(l.name) === slugify(name));
+    const existing = all.find((l) => l.slug === slugify(name));
     if (existing) {
-        addLabel(existing);
-        return;
+      addLabel(existing);
+      return;
     }
 
     const res = await fetch("/api/labels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, name }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope, name }),
     });
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-        throw new Error(data?.error ?? "Failed to create label");
+      throw new Error(data?.error ?? "Failed to create label");
     }
 
     const label = data?.label as PickerLabel | undefined;
-    if (!label?.id) {
-        throw new Error("Label creation returned no id");
+    if (!label?.id || !label?.slug) {
+      throw new Error("Label creation returned incomplete data");
     }
 
     setAll((prev) => {
-        const map = new Map(prev.map((x) => [x.id, x] as const));
-        map.set(label.id, label);
+      const map = new Map(prev.map((x) => [labelKey(x), x] as const));
+      map.set(labelKey(label), label);
 
-        return Array.from(map.values()).sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-        );
+      return Array.from(map.values()).sort((a, b) => {
+        if (a.status !== b.status) {
+          return a.status === "APPROVED" ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, undefined, {
+          sensitivity: "base",
+        });
+      });
     });
 
     addLabel(label);
-    }
+  }
 
   return (
-    <div ref={boxRef} className="grid gap-2">
+    <div ref={boxRef} className="grid gap-3">
       {selectedLabels.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {selectedLabels.map((label) => (
-            <span key={label.id} className="inline-flex items-center gap-2">
+            <span
+              key={labelKey(label)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5"
+            >
               <Badge tone={label.status === "APPROVED" ? "neutral" : "featured"}>
                 {label.name}
                 {label.status !== "APPROVED" ? " (pending)" : ""}
               </Badge>
               <button
-                type="button"
-                className="text-[12px] text-[var(--muted)] hover:text-[var(--text)]"
-                onClick={() => removeLabel(label.id)}
-                disabled={disabled}
-                aria-label={`Remove ${label.name}`}
-              >
-                ✕
-              </button>
+  type="button"
+  className="rounded-full p-0.5 text-[12px] text-[var(--muted)] outline-none hover:text-[var(--text)] focus:outline-none"
+  onClick={() => removeLabel(label)}
+  disabled={disabled}
+  aria-label={`Remove ${label.name}`}
+>
+  ✕
+</button>
             </span>
           ))}
         </div>
@@ -205,7 +222,7 @@ export default function LabelMultiSelect(props: {
         />
 
         {open ? (
-          <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+          <div className="absolute z-30 mt-2 max-h-80 w-full overflow-y-auto overscroll-contain rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
             {loading ? (
               <div className="px-4 py-3 text-[13px] text-[var(--muted)]">
                 Loading tags…
@@ -221,9 +238,10 @@ export default function LabelMultiSelect(props: {
             {!loading &&
               filtered.map((label) => (
                 <button
-                  key={label.id}
+                  key={labelKey(label)}
                   type="button"
                   className="flex w-full items-center justify-between px-4 py-3 text-left text-[14px] hover:bg-[var(--surface-2)]"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => addLabel(label)}
                   disabled={disabled}
                 >
@@ -239,6 +257,7 @@ export default function LabelMultiSelect(props: {
                 <Button
                   type="button"
                   variant="secondary"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={createAndAttach}
                   disabled={disabled}
                 >

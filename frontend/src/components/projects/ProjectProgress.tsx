@@ -325,7 +325,7 @@ export default function ProjectProgress({ project, viewerRole }: { project: Proj
               )
             }
           >
-            {loading === "CONFIRM_MEASUREMENTS_CUSTOMER" ? "Saving..." : "I updated my measurements"}
+            {loading === "CONFIRM_MEASUREMENTS_CUSTOMER" ? "Saving..." : "Confirm Measurements"}
           </Button>
         ) : null}
 

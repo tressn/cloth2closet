@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { CURRENCY_SET } from "@/lib/lookup/currencies";
 import { COUNTRY_SET } from "@/lib/lookup/countries";
+import { LabelScope, LabelStatus } from "@prisma/client";
 
 const LANGUAGE_SET = new Set(["en", "fr", "es", "de", "it", "pt"]);
 
@@ -20,15 +21,16 @@ function slugify(name: string) {
 
 export async function PATCH(req: Request) {
   const session = await getServerSession(authOptions);
+
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+
   if (session.user.role !== "DRESSMAKER" && session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const userId = session.user.id; // ✅ define once
-
+  const userId = session.user.id;
   const body = await req.json().catch(() => ({} as any));
 
   const countryCode =
@@ -46,7 +48,6 @@ export async function PATCH(req: Request) {
       ? body.displayName.trim()
       : null;
 
-  // basePriceFrom is dollars (Int). Keep it an integer.
   const safeBasePriceFrom =
     typeof body.basePriceFrom === "number" && Number.isFinite(body.basePriceFrom)
       ? Math.max(0, Math.trunc(body.basePriceFrom))
@@ -68,7 +69,7 @@ export async function PATCH(req: Request) {
 
   const languageCodes: string[] = Array.isArray(body.languageCodes)
     ? body.languageCodes
-        .map((x: any) => String(x).trim().toLowerCase())
+        .map((x: unknown) => String(x).trim().toLowerCase())
         .filter(Boolean)
     : [];
 
@@ -80,8 +81,22 @@ export async function PATCH(req: Request) {
     );
   }
 
+  const specialtyIdsRaw: unknown[] = Array.isArray(body.specialtyIds)
+    ? body.specialtyIds
+    : [];
+
+  const specialtyIds: string[] = Array.from(
+    new Set(
+      specialtyIdsRaw.filter((x: unknown): x is string => typeof x === "string")
+    )
+  )
+    .map((x: string) => x.trim())
+    .filter((x: string) => x.length > 0)
+    .slice(0, 20);
+
+  // legacy fallback for any older form still sending plain specialty names
   const safeSpecialties = Array.isArray(body.specialties)
-    ? body.specialties.map((x: any) => normalizeName(String(x))).filter(Boolean)
+    ? body.specialties.map((x: unknown) => normalizeName(String(x))).filter(Boolean)
     : [];
 
   const safeWebsiteUrl =
@@ -99,7 +114,6 @@ export async function PATCH(req: Request) {
       ? body.tiktokHandle.trim().replace(/^@/, "")
       : null;
 
-  // ✅ read existing socialLinks so we don't wipe other keys
   const existing = await prisma.dressmakerProfile.findUnique({
     where: { userId },
     select: { socialLinks: true },
@@ -107,7 +121,6 @@ export async function PATCH(req: Request) {
 
   const prev = (existing?.socialLinks ?? {}) as Record<string, unknown>;
 
-  // ✅ update profile + socialLinks.tiktok
   const updated = await prisma.dressmakerProfile.update({
     where: { userId },
     data: {
@@ -126,7 +139,6 @@ export async function PATCH(req: Request) {
       websiteUrl: safeWebsiteUrl,
       instagramHandle: safeInstagramHandle,
 
-      // ✅ THIS WAS MISSING
       socialLinks: {
         ...prev,
         tiktok: safeTiktokHandle || null,
@@ -135,10 +147,26 @@ export async function PATCH(req: Request) {
     select: { id: true },
   });
 
-  // reset + recreate specialties
   await prisma.dressmakerSpecialty.deleteMany({
     where: { dressmakerProfileId: updated.id },
   });
+
+  const attachLabelIds = new Set<string>();
+
+  if (specialtyIds.length) {
+    const existingSpecialtyLabels = await prisma.label.findMany({
+      where: {
+        id: { in: specialtyIds },
+        scope: LabelScope.SPECIALTY,
+        status: { in: [LabelStatus.APPROVED, LabelStatus.PENDING] },
+      },
+      select: { id: true },
+    });
+
+    for (const label of existingSpecialtyLabels) {
+      attachLabelIds.add(label.id);
+    }
+  }
 
   for (const s of safeSpecialties) {
     const slug = slugify(s);
@@ -156,8 +184,16 @@ export async function PATCH(req: Request) {
       },
     });
 
-    await prisma.dressmakerSpecialty.create({
-      data: { dressmakerProfileId: updated.id, labelId: label.id },
+    attachLabelIds.add(label.id);
+  }
+
+  if (attachLabelIds.size) {
+    await prisma.dressmakerSpecialty.createMany({
+      data: Array.from(attachLabelIds).map((labelId) => ({
+        dressmakerProfileId: updated.id,
+        labelId,
+      })),
+      skipDuplicates: true,
     });
   }
 
