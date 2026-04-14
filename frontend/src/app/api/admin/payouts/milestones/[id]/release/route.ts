@@ -4,13 +4,13 @@ import { releaseMilestonePayoutOrThrow } from "@/lib/payouts";
 
 export const runtime = "nodejs";
 
-export async function POST(_: Request, { params }: { params: { id: string } }) {
+export async function POST(_: Request, { params }: { params: Promise<{ id: string }> }) {
   await requireRole(["ADMIN"]);
-
+  const { id } = await params;
   try {
     const result = await releaseMilestonePayoutOrThrow({
-      milestoneId: params.id,
-      idempotencyKey: `admin:milestone:${params.id}:release`,
+      milestoneId: id,
+      idempotencyKey: `admin:milestone:${id}:release`,
     });
     return NextResponse.json(result);
   } catch (e: any) {

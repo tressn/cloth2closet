@@ -34,7 +34,7 @@ type Project = {
 
   details?: {
     requireSketch: boolean;
-    sketchImage: string[];
+    referenceImages: string[];
     isRush: boolean;
     wantsCalico: boolean;
 
@@ -193,11 +193,16 @@ export default function ProjectProgress({ project, viewerRole }: { project: Proj
     !!d?.sketchSubmittedAt &&
     !d?.sketchApprovedAt;
 
-  const canConfirmMeasurementsDressmaker =
-    (isDressmaker || isAdmin) && project.status === "IN_PROGRESS" && !d?.measurementsConfirmedByDressmakerAt;
-
   const canConfirmMeasurementsCustomer =
-    (isCustomer || isAdmin) && project.status === "IN_PROGRESS" && !d?.measurementsConfirmedByCustomerAt;
+  (isCustomer || isAdmin) &&
+  project.status === "IN_PROGRESS" &&
+  !d?.measurementsConfirmedByCustomerAt;
+
+  const canConfirmMeasurementsDressmaker =
+    (isDressmaker || isAdmin) &&
+    project.status === "IN_PROGRESS" &&
+    !!d?.measurementsConfirmedByCustomerAt && 
+    !d?.measurementsConfirmedByDressmakerAt;
 
   const canMarkFitSampleSent =
     (isDressmaker || isAdmin) && project.status === "IN_PROGRESS" && !!d?.wantsCalico && !d?.fitSampleSentAt;
@@ -242,22 +247,39 @@ export default function ProjectProgress({ project, viewerRole }: { project: Proj
         <div className="h-full bg-[var(--plum-500)]" style={{ width: `${pct}%` }} />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid gap-1.5">
         {steps.map((s) => (
           <div
             key={s.key}
             className={[
-              "flex items-center justify-between rounded-xl border px-4 py-3",
+              "flex items-center justify-between rounded-xl border px-4 py-3 transition-colors",
               s.done
-                ? "border-[rgba(134,56,111,0.25)] bg-[rgba(134,56,111,0.06)]"
+                ? "border-[rgba(134,56,111,0.2)] bg-[rgba(134,56,111,0.05)]"
                 : "border-[var(--border)] bg-[var(--surface)]",
             ].join(" ")}
           >
-            <div className="text-[14px] text-[var(--text)]">{s.done ? "✅ " : "• "} {s.label}</div>
+            <div className="flex items-center gap-3">
+              {/* Refined status dot instead of emoji */}
+              <div className={[
+                "h-2 w-2 rounded-full shrink-0",
+                s.done ? "bg-[var(--plum-500)]" : "bg-[var(--border)]",
+              ].join(" ")} />
+              <div className={[
+                "text-[14px]",
+                s.done ? "text-[var(--text)]" : "text-[var(--muted)]",
+              ].join(" ")}>
+                {s.label}
+              </div>
+            </div>
             <div className="text-[12px] text-[var(--muted)]">
-              {s.key === "SKETCH" && d?.sketchApprovedAt ? `Approved ${fmtDate(d.sketchApprovedAt)}` : null}
+              {s.done && s.key !== "REQUESTED" ? (
+                <span className="text-[var(--plum-600)] font-medium">Done </span>
+              ) : null}
+              {s.key === "SKETCH" && d?.sketchApprovedAt
+                ? <span className="ml-1 text-[var(--muted)]">{fmtDate(d.sketchApprovedAt)}</span>
+                : null}
               {s.key === "SHIPPED" && project.projectShipping?.trackingNumber
-                ? `${project.projectShipping?.carrier ?? "Carrier"} ${project.projectShipping?.trackingNumber}`
+                ? <span className="ml-1">{project.projectShipping.trackingNumber}</span>
                 : null}
             </div>
           </div>

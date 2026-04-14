@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { NavLink } from "@/components/ui/NavLink";
+import { prisma} from "@/lib/prisma";
 
 type Role = "CUSTOMER" | "DRESSMAKER" | "ADMIN" | null | undefined;
 
@@ -55,7 +56,15 @@ export default async function DashboardSidebar() {
   const isDressmaker = role === "DRESSMAKER";
   const isCustomer = role === "CUSTOMER" || role == null;
 
-  const name = user?.name || user?.email || "Account";
+  // dressmakers who previously had customer projects can still access them even after role change
+  const hasCustomerProjects =
+    isDressmaker && user?.id
+      ? (await prisma.project.count({
+          where: { customerId: (user as any).id },
+        })) > 0
+      : false;
+
+  const name = user?.name || user?.email?.split("@")[0] || "Account";
 
   return (
     <aside className="hidden lg:block">
@@ -66,7 +75,14 @@ export default async function DashboardSidebar() {
             {/* ✅ avatar + name + role badge all inside the same row */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <Avatar name={name} subtitle={user?.email ?? undefined} />
+                <Avatar
+                  name={name}
+                  subtitle={
+                    (user as any)?.username
+                      ? `@${(user as any).username}`
+                      : user?.email ?? undefined
+                  }
+                />
               </div>
 
               <div className="shrink-0 pt-1">
@@ -92,7 +108,7 @@ export default async function DashboardSidebar() {
               />
 
               {/* Customer */}
-              {(isCustomer || isAdmin) && (
+              {(isCustomer || isAdmin || hasCustomerProjects) && (
                 <>
                   <NavLink
                     href="/dashboard/customer/profile"

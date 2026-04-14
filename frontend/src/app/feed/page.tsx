@@ -30,6 +30,7 @@ type FeedItem =
       countryCode: string | null;
       countryLabel: string;
       itemTitle: string;
+      photoUrls: string[];
     };
 
 function Stars({ rating }: { rating: number }) {
@@ -83,8 +84,9 @@ export default async function FeedPage() {
     id: true,
     rating: true,
     text: true,
+    photoUrls: true,
     createdAt: true,
-    author: { select: { name: true } },
+    author: { select: { name: true, username: true } },
     project: {
       select: {
         dressmaker: {
@@ -92,7 +94,7 @@ export default async function FeedPage() {
             dressmakerProfile: {
               select: {
                 displayName: true,
-                countryCode: true, // ✅ was location
+                countryCode: true, 
               },
             },
           },
@@ -140,14 +142,31 @@ export default async function FeedPage() {
         id: `r_${r.id}`,
         rating: r.rating,
         quote: r.text!,
-        reviewer: r.author.name ?? "Customer",
+        reviewer: r.author.username ?? r.author.name ?? "Customer",
         countryCode: code,
         countryLabel: label,
         itemTitle: dm?.displayName ?? "Dressmaker",
+        photoUrls: r.photoUrls ?? [],
       };
     });
 
-  const FEED: FeedItem[] = [...uploads, ...reviewItems].slice(0, 30);
+  // Attach createdAt for sorting then strip it off
+  const uploadsWithDate = portfolio.map((p, i) => ({
+    ...uploads[i],
+    _createdAt: p.createdAt,
+  }));
+
+  const reviewsWithDate = reviews
+    .filter((r) => r.text && r.text.trim().length > 0)
+    .map((r, i) => ({
+      ...reviewItems[i],
+      _createdAt: r.createdAt,
+    }));
+
+  const FEED: FeedItem[] = [...uploadsWithDate, ...reviewsWithDate]
+    .sort((a, b) => new Date(b._createdAt).getTime() - new Date(a._createdAt).getTime())
+    .slice(0, 30)
+    .map(({ _createdAt, ...item }) => item as FeedItem);
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
@@ -227,6 +246,17 @@ export default async function FeedPage() {
                       <span className="font-semibold text-[var(--text)]">{item.reviewer}</span> in {item.countryLabel} ·
                       reviewing <span className="font-semibold text-[var(--text)]">{item.itemTitle}</span>
                     </div>
+                    {item.photoUrls.length > 0 ? (
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        {item.photoUrls.slice(0, 3).map((url, idx) => (
+                          <a key={`${url}-${idx}`} href={url} target="_blank" rel="noreferrer"
+                            className="block overflow-hidden rounded-xl border border-[var(--border)]">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`Review photo ${idx + 1}`} className="h-24 w-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </CardBody>
                 </Card>
               );

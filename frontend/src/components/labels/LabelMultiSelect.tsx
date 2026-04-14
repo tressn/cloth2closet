@@ -31,7 +31,8 @@ function labelKey(label: Pick<PickerLabel, "id" | "slug">) {
 }
 
 export default function LabelMultiSelect(props: {
-  scope: Scope;
+  scope?: Scope;
+  scopes?: Scope[];
   selectedLabels?: PickerLabel[];
   onChange: (nextLabels: PickerLabel[]) => void;
   placeholder?: string;
@@ -39,14 +40,16 @@ export default function LabelMultiSelect(props: {
   allowCreate?: boolean;
 }) {
   const {
-    scope,
     selectedLabels = [],
     onChange,
     placeholder = "Start typing to add tags…",
     disabled,
   } = props;
 
+  const scopes = props.scopes ?? (props.scope ? [props.scope] : []);
   const allowCreate = props.allowCreate ?? true;
+  const canCreateForThisPicker = allowCreate && scopes.length === 1;
+  const createScope = scopes[0];
 
   const [all, setAll] = useState<PickerLabel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +62,13 @@ export default function LabelMultiSelect(props: {
     let alive = true;
     setLoading(true);
 
-    fetch(`/api/labels?scope=${scope}&includePending=1`, { cache: "no-store" })
+    const sp = new URLSearchParams();
+    for (const s of scopes) {
+      sp.append("scope", s);
+    }
+    sp.set("includePending", "1");
+
+    fetch(`/api/labels?${sp.toString()}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (!alive) return;
@@ -83,7 +92,7 @@ export default function LabelMultiSelect(props: {
     return () => {
       alive = false;
     };
-  }, [scope]);
+  }, [scopes.join("|")]);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -98,7 +107,7 @@ export default function LabelMultiSelect(props: {
   }, []);
 
   const selectedKeys = useMemo(
-    () => new Set((selectedLabels ?? []).map((l) => labelKey(l))),
+    () => new Set(selectedLabels.map((l) => labelKey(l))),
     [selectedLabels]
   );
 
@@ -115,7 +124,7 @@ export default function LabelMultiSelect(props: {
   }, [all, q, selectedKeys]);
 
   const canCreate = useMemo(() => {
-    if (!allowCreate) return false;
+    if (!canCreateForThisPicker) return false;
 
     const name = normalizeName(q);
     if (name.length < 2) return false;
@@ -124,7 +133,7 @@ export default function LabelMultiSelect(props: {
     const exists = all.some((l) => l.slug === nextSlug);
 
     return !exists;
-  }, [allowCreate, q, all]);
+  }, [canCreateForThisPicker, q, all]);
 
   function addLabel(label: PickerLabel) {
     const nextMap = new Map(selectedLabels.map((x) => [labelKey(x), x] as const));
@@ -140,6 +149,8 @@ export default function LabelMultiSelect(props: {
   }
 
   async function createAndAttach() {
+    if (!canCreateForThisPicker || !createScope) return;
+
     const name = normalizeName(q);
     if (name.length < 2) return;
 
@@ -152,7 +163,7 @@ export default function LabelMultiSelect(props: {
     const res = await fetch("/api/labels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope, name }),
+      body: JSON.stringify({ scope: createScope, name }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -196,14 +207,14 @@ export default function LabelMultiSelect(props: {
                 {label.status !== "APPROVED" ? " (pending)" : ""}
               </Badge>
               <button
-  type="button"
-  className="rounded-full p-0.5 text-[12px] text-[var(--muted)] outline-none hover:text-[var(--text)] focus:outline-none"
-  onClick={() => removeLabel(label)}
-  disabled={disabled}
-  aria-label={`Remove ${label.name}`}
->
-  ✕
-</button>
+                type="button"
+                className="rounded-full p-0.5 text-[12px] text-[var(--muted)] outline-none hover:text-[var(--text)] focus:outline-none"
+                onClick={() => removeLabel(label)}
+                disabled={disabled}
+                aria-label={`Remove ${label.name}`}
+              >
+                ✕
+              </button>
             </span>
           ))}
         </div>

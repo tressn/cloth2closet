@@ -16,10 +16,8 @@ function emailPrefix(email?: string | null) {
 function displayPersonName(person?: PersonLike | null, fallback = "Customer") {
   const name = person?.name?.trim();
   if (name) return name;
-
   const emailName = emailPrefix(person?.email);
   if (emailName) return emailName;
-
   return fallback;
 }
 
@@ -34,15 +32,20 @@ export function getConversationDisplayMeta(args: {
   if (isProjectConversation) {
     const customerName = displayPersonName(customer, "Customer");
     const projectTitle = project?.title?.trim() || "Custom Outfit";
-
     return {
-      title: `${customerName} • ${projectTitle}`,
-      subtitle: project?.projectCode?.trim() || null,
+      // ✅ Person name as title — short, never overflows
+      title: customerName,
+      // ✅ Project title on its own line
+      subtitle: projectTitle,
+      // ✅ Project code on third line — smallest, truncates safely
+      detail: project?.projectCode?.trim() ?? null,
     };
   }
 
+  // ✅ Direct messages are clearly labelled differently from project threads
   return {
     title: displayPersonName(otherParticipant, "Conversation"),
     subtitle: "Direct message",
+    detail: null,
   };
 }

@@ -65,27 +65,36 @@ export async function POST(
     return NextResponse.json({ error: "Too many attachments (max 10)" }, { status: 400 })
   }
 
-  const message = await prisma.message.create({
-    data: {
-      conversationId,
-      senderId: userId,
-      text: text || null,
-      attachments: [],
-    },
-  })
-
-  if (attachments.length > 0) {
-    await prisma.fileAsset.createMany({
-      data: attachments.map((url) => ({
-        url,
-        purpose: "MESSAGE_ATTACHMENT",
-        ownerId: userId,
-        messageId: message.id,
-        projectId: convo.projectId ?? null,
-      })),
-      skipDuplicates: true,
+  const message = await prisma.$transaction(async (tx) => {
+    const createdMessage = await tx.message.create({
+      data: {
+        conversationId,
+        senderId: userId,
+        text: text || null,
+        attachments: [],
+      },
     })
-  }
+
+    if (attachments.length > 0) {
+      await tx.fileAsset.createMany({
+        data: attachments.map((url) => ({
+          url,
+          purpose: "MESSAGE_ATTACHMENT",
+          ownerId: userId,
+          messageId: createdMessage.id,
+          projectId: convo.projectId ?? null,
+        })),
+        skipDuplicates: true,
+      })
+    }
+
+    await tx.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    })
+
+    return createdMessage
+  })
 
   return NextResponse.json({ ok: true, message })
 }

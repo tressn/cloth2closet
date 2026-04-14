@@ -40,14 +40,17 @@ export default async function DressmakerProjectDetailPage({
     include: {
       details: true,
       payment: true,
+      milestones: true,
       conversations: true,
       projectMeasurementGate: true,
+      sketchSubmission: true,
       customer: {
         include: {
           measurements: {
             orderBy: { updatedAt: "desc" },
             take: 1,
           },
+          customerProfile: true,
         },
       },
       projectShipping: {
@@ -64,29 +67,35 @@ export default async function DressmakerProjectDetailPage({
   }
 
   const details = project.details;
+  const customerDisplayName = project.customer.name ?? project.customer.username ?? "Customer";
   const convoId = project.conversations[0]?.id;
-  const sketchImages = details?.sketchImage ?? [];
+  const sketchImages = project.sketchSubmission?.imageUrls ?? [];
   const sketchSubmittedAt = details?.sketchSubmittedAt;
   const sketchApprovedAt = details?.sketchApprovedAt;
 
   const latestMeasurement = project.customer.measurements[0] ?? null;
-  const measurementFields =
-    latestMeasurement?.fieldsJson &&
-    typeof latestMeasurement.fieldsJson === "object" &&
-    !Array.isArray(latestMeasurement.fieldsJson)
-      ? (latestMeasurement.fieldsJson as Record<string, unknown>)
-      : null;
 
-  const requestedFields =
-    project.projectMeasurementGate?.requestedFields?.length
-      ? project.projectMeasurementGate.requestedFields
-      : details?.measurementsRequested ?? [];
+  const snapshotFields =
+  project.projectMeasurementGate?.snapshotFieldsJson &&
+  typeof project.projectMeasurementGate.snapshotFieldsJson === "object" &&
+  !Array.isArray(project.projectMeasurementGate.snapshotFieldsJson)
+    ? (project.projectMeasurementGate.snapshotFieldsJson as Record<string, unknown>)
+    : null;
 
-  const visibleMeasurementEntries = measurementFields
-    ? Object.entries(measurementFields).filter(([key]) =>
-        requestedFields.length > 0 ? requestedFields.includes(key) : true
-      )
-    : [];
+const latestCustomerMeasurementFields =
+  latestMeasurement?.fieldsJson &&
+  typeof latestMeasurement.fieldsJson === "object" &&
+  !Array.isArray(latestMeasurement.fieldsJson)
+    ? (latestMeasurement.fieldsJson as Record<string, unknown>)
+    : null;
+
+const measurementsLocked = Boolean(project.projectMeasurementGate?.dressmakerConfirmedAt);
+
+const measurementFields = measurementsLocked
+  ? snapshotFields
+  : latestCustomerMeasurementFields;
+
+  const visibleMeasurementEntries = measurementFields ? Object.entries(measurementFields) : [];
 
   const summaryItems = [
     { label: "Event date", value: formatDateTime(details?.eventDate) },
@@ -111,10 +120,21 @@ export default async function DressmakerProjectDetailPage({
     { label: "Sketch required", value: details?.requireSketch ? "Yes" : "No" },
   ];
 
+  // Normalize for ProjectProgress, which still expects details.sketchImage
+  const projectForProgress = {
+    ...project,
+    details: details
+      ? {
+          ...details,
+          sketchImage: project.sketchSubmission?.imageUrls ?? [],
+        }
+      : null,
+  };
+
   return (
     <DashboardShell
       title={project.title ?? project.projectCode}
-      subtitle="Review the brief, manage the workflow, and send a quote."
+      subtitle={`${project.projectCode} · ${customerDisplayName}`}
       tabs={[{ label: "Back to projects", href: "/dashboard/dressmaker/projects" }]}
     >
       <div className="max-w-5xl space-y-6">
@@ -126,37 +146,69 @@ export default async function DressmakerProjectDetailPage({
           />
           <CardBody>
             <ProjectProgress
-              project={project}
+              project={projectForProgress}
               viewerRole={session.user.role ?? "DRESSMAKER"}
             />
           </CardBody>
 
           <CardBody className="grid gap-3 border-t border-[var(--border)] text-[14px] text-[var(--muted)] sm:grid-cols-2">
-            <div>
-              Current quote:{" "}
-              <span className="font-semibold text-[var(--text)]">
-                {project.quotedTotalAmount != null
-                  ? formatMoney(project.quotedTotalAmount, project.currency)
-                  : "Not quoted yet"}
-              </span>
-            </div>
+            {(() => {
+              const deposit = project.milestones.find((m) => m.type === "DEPOSIT");
+              const final = project.milestones.find((m) => m.type === "FINAL");
+              const depositPaid = deposit?.status === "PAID" || deposit?.status === "RELEASED";
+              const finalPaid = final?.status === "PAID" || final?.status === "RELEASED";
 
-            <div>
-              Currency:{" "}
-              <span className="font-semibold text-[var(--text)]">{project.currency}</span>
-            </div>
+              return (
+                <>
+                  <div>
+                    Total quote:{" "}
+                    <span className="font-semibold text-[var(--text)]">
+                      {project.quotedTotalAmount != null
+                        ? formatMoney(project.quotedTotalAmount, project.currency)
+                        : "Not quoted yet"}
+                    </span>
+                  </div>
 
-            {convoId ? (
-              <div className="sm:col-span-2">
-                Messages:{" "}
-                <Link
-                  className="underline text-[var(--plum-600)]"
-                  href={`/messages/${convoId}`}
-                >
-                  Open conversation
-                </Link>
-              </div>
-            ) : null}
+                  <div>
+                    Currency:{" "}
+                    <span className="font-semibold text-[var(--text)]">{project.currency}</span>
+                  </div>
+
+                  {deposit ? (
+                    <div>
+                      Deposit ({project.depositPercent ?? "—"}%):{" "}
+                      <span className="font-semibold text-[var(--text)]">
+                        {formatMoney(deposit.amount, project.currency)}
+                      </span>{" "}
+                      <span className={depositPaid ? "text-green-600 font-semibold" : ""}>
+                        {depositPaid ? "— Paid ✓" : `— ${deposit.status}`}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {final ? (
+                    <div>
+                      Final payment:{" "}
+                      <span className="font-semibold text-[var(--text)]">
+                        {formatMoney(final.amount, project.currency)}
+                      </span>{" "}
+                      <span className={finalPaid ? "text-green-600 font-semibold" : ""}>
+                        {finalPaid ? "— Paid ✓" : `— ${final.status}`}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {convoId ? (
+                    <div className="sm:col-span-2">
+                      Messages:{" "}
+                      <Link className="underline text-[var(--plum-600)]" href={`/messages/${convoId}`}>
+                        Open conversation
+                      </Link>
+                    </div>
+                  ) : null}
+                </>
+              );
+            })()}
           </CardBody>
         </Card>
 
@@ -229,7 +281,7 @@ export default async function DressmakerProjectDetailPage({
                   Reference images
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {details.referenceImages.slice(0, 6).map((url, idx) => (
+                  {details.referenceImages.slice(0, 6).map((url: string, idx: number) => (
                     <a
                       key={`${url}-${idx}`}
                       href={url}
@@ -267,7 +319,18 @@ export default async function DressmakerProjectDetailPage({
         <Card>
           <CardHeader
             title="Customer measurements"
-            subtitle="Latest sizing reference for this project."
+            subtitle={
+              measurementsLocked
+                ? "Approved measurements locked for this project."
+                : "Latest customer measurements for review before approval."
+            }
+            right={
+              measurementsLocked ? (
+                <Badge tone="success">Locked</Badge>
+              ) : (
+                <Badge tone="neutral">Reviewing</Badge>
+              )
+            }
           />
           <CardBody>
             {!measurementFields ? (
@@ -328,7 +391,7 @@ export default async function DressmakerProjectDetailPage({
             ) : sketchImages.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {sketchImages.slice(0, 10).map((url, idx) => (
+                  {sketchImages.slice(0, 10).map((url: string, idx: number) => (
                     <a
                       key={`${url}-${idx}`}
                       href={url}
@@ -374,20 +437,67 @@ export default async function DressmakerProjectDetailPage({
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Project quote"
-            subtitle="Enter the full customer-facing amount."
-          />
-          <CardBody>
-            <QuoteForm
-              projectId={project.id}
-              existingAmount={project.quotedTotalAmount}
-              currency={project.currency}
-              existingDepositPercent={project.depositPercent}
+        {(() => {
+          const depositMilestone = project.milestones.find((m) => m.type === "DEPOSIT");
+          const depositAlreadyPaid =
+            depositMilestone?.status === "PAID" || depositMilestone?.status === "RELEASED";
+          const depositPaidAmount = depositAlreadyPaid ? depositMilestone!.amount : null;
+
+          return (
+            <Card>
+              <CardHeader
+                title={depositAlreadyPaid ? "Update final invoice" : "Project quote"}
+                subtitle={
+                  depositAlreadyPaid
+                    ? `Deposit of ${formatMoney(depositPaidAmount!, project.currency)} already paid. Update the total to adjust the remaining balance.`
+                    : "Enter the full customer-facing amount including all costs."
+                }
+              />
+              <CardBody>
+                <QuoteForm
+                  projectId={project.id}
+                  existingAmount={project.quotedTotalAmount}
+                  currency={project.currency}
+                  existingDepositPercent={project.depositPercent}
+                  depositAlreadyPaid={depositAlreadyPaid}
+                  depositPaidAmount={depositPaidAmount}
+                />
+              </CardBody>
+            </Card>
+          );
+        })()}
+
+        {(project.status === "READY_TO_SHIP" ||
+          project.status === "SHIPPED" ||
+          project.status === "COMPLETED") ? (
+          <Card>
+            <CardHeader
+              title="Shipping address"
+              subtitle="Customer's address for this shipment. Handle with care."
             />
-          </CardBody>
-        </Card>
+            <CardBody>
+              {project.customer.customerProfile?.fullName ?? "—"}
+              {project.customer.customerProfile?.address1 ? (
+                <div className="text-[14px] text-[var(--text)] space-y-1">
+                  <div>{project.customer.customerProfile.address1}</div>
+                  {project.customer.customerProfile.address2 ? (
+                    <div>{project.customer.customerProfile.address2}</div>
+                  ) : null}
+                  <div>
+                    {[
+                      project.customer.customerProfile.postalCode,
+                      project.customer.customerProfile.countryCode,
+                    ].filter(Boolean).join(", ")}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[14px] text-[var(--muted)]">
+                  Customer has not added a shipping address yet. Ask them via messages.
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import TicketStatusActions from "./TicketStatusActions";
 
 export default async function AdminSupportPage() {
   await requireRole(["ADMIN"]);
@@ -88,7 +89,22 @@ export default async function AdminSupportPage() {
 
                       <div className="flex flex-col items-end gap-2">
                         <Badge tone="neutral">{t.category}</Badge>
-                        <Badge tone={t.status === "OPEN" ? "featured" : "neutral"}>{t.status}</Badge>
+                        <Badge
+                          tone={
+                            t.status === "OPEN"
+                              ? "featured"
+                              : t.status === "CLOSED"
+                                ? "success"
+                                : "neutral"
+                          }
+                        >
+                          {t.status}
+                        </Badge>
+
+                        <TicketStatusActions
+                          ticketId={t.id}
+                          currentStatus={t.status}
+                        />
                       </div>
                     </div>
                   </div>

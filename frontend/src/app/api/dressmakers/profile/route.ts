@@ -121,6 +121,11 @@ export async function PATCH(req: Request) {
 
   const prev = (existing?.socialLinks ?? {}) as Record<string, unknown>;
 
+  await prisma.user.update({
+    where: { id: userId },
+    data: { name: safeDisplayName },
+  });
+  
   const updated = await prisma.dressmakerProfile.update({
     where: { userId },
     data: {

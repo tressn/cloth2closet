@@ -358,7 +358,6 @@ model ProjectDetails {
   fabricAgreedNote String?
 
   requireSketch Boolean  @default(false)
-  sketchImage   String[]
 
   isRush      Boolean @default(false)
   wantsCalico Boolean @default(false)
@@ -420,6 +419,11 @@ model ProjectMeasurementGate {
 
   // customer confirms they updated measurements
   customerConfirmedAt DateTime?
+
+  snapshotFieldsJson Json?
+  lockedAt           DateTime?
+  sourceMeasurementId String?
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -17,6 +17,11 @@ function milestoneLabel(status?: string | null) {
   return status;
 }
 
+function formatDateTime(value: Date | string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString();
+}
+
 export default async function CustomerProjectDetailPage({
   params,
 }: {
@@ -31,50 +36,70 @@ export default async function CustomerProjectDetailPage({
     where: { id },
     include: {
       details: true,
-      payment: true, // keep if you still use it as rollup, but not as truth for milestones
+      payment: true,
       review: true,
-      milestones: true, // ✅ REQUIRED for deposit/final UI
+      milestones: true,
+      sketchSubmission: true,
       projectShipping: {
         include: {
           carrier: { select: { name: true } },
+        },
+      },
+      dressmaker: {
+        select: {
+          name: true,
+          username: true,
+          dressmakerProfile: {
+            select: { displayName: true },
+          },
         },
       },
     },
   });
 
   if (!project) notFound();
-  if (project.customerId !== session.user.id && session.user.role !== "ADMIN") notFound();
+  if (project.customerId !== session.user.id && session.user.role !== "ADMIN") {
+    notFound();
+  }
 
-  // Find milestones
+  const details = project.details;
+
+  const dressmakerDisplayName = project.dressmaker.dressmakerProfile?.displayName ?? project.dressmaker.name ?? project.dressmaker.username ?? "Dressmaker";
+  
+  const sketchImages = project.sketchSubmission?.imageUrls ?? [];
+
   const deposit = project.milestones.find((m) => m.type === "DEPOSIT");
   const final = project.milestones.find((m) => m.type === "FINAL");
 
-  const depositPaid = deposit?.status === "PAID" || deposit?.status === "RELEASED";
-  const finalPaid = final?.status === "PAID" || final?.status === "RELEASED";
+  const depositPaid =
+    deposit?.status === "PAID" || deposit?.status === "RELEASED";
+  const finalPaid =
+    final?.status === "PAID" || final?.status === "RELEASED";
 
-  // When to show Pay Deposit:
-  // - After quote accepted (your quote route sets ACCEPTED)
-  // - And deposit not paid
   const showPayDeposit = project.status === "ACCEPTED" && !depositPaid;
+  const finalSubmitted = !!details?.finalSubmittedAt;
+  const showPayFinal = (!!details?.finalApprovedAt || project.status === "READY_TO_SHIP") && !finalPaid;
 
-  // When to show Pay Final:
-  // You said:
-  // - after final is submitted (so customer can pay while reviewing)
-  // - also after final approval
-  // So: if finalSubmittedAt exists OR project is READY_TO_SHIP, and final not paid
-  const finalSubmitted = !!project.details?.finalSubmittedAt;
-  const showPayFinal = (finalSubmitted || project.status === "READY_TO_SHIP") && !finalPaid;
-
-  // Reviews: unlock after completed AND final payment is paid (not the old project.payment.status)
   const canReview =
     project.status === "COMPLETED" &&
     finalPaid &&
     !project.review;
 
+  // Temporary shim for ProjectProgress until its prop type is updated
+  const projectForProgress = {
+    ...project,
+    details: details
+      ? {
+          ...details,
+          sketchImage: sketchImages,
+        }
+      : null,
+  };
+
   return (
     <DashboardShell
-      title={project.projectCode}
-      subtitle="Project overview for customers."
+      title={project.title ?? project.projectCode}
+      subtitle={`${project.projectCode} · By ${dressmakerDisplayName}`}
       tabs={[
         { label: "Back to projects", href: "/dashboard/customer/projects" },
         { label: "Measurements", href: "/dashboard/customer/measurements" },
@@ -89,9 +114,15 @@ export default async function CustomerProjectDetailPage({
         </Card>
 
         <Card>
-          <CardHeader title="Progress" subtitle="Track what happens next, step-by-step." />
+          <CardHeader
+            title="Progress"
+            subtitle="Track what happens next, step-by-step."
+          />
           <CardBody>
-            <ProjectProgress project={project} viewerRole={session.user.role ?? "CUSTOMER"} />
+            <ProjectProgress
+              project={projectForProgress}
+              viewerRole={session.user.role ?? "CUSTOMER"}
+            />
           </CardBody>
 
           <CardBody className="space-y-4 text-[14px] text-[var(--muted)]">
@@ -104,7 +135,6 @@ export default async function CustomerProjectDetailPage({
               </span>
             </div>
 
-            {/* ✅ Milestone payment summary (replace old Payment status display) */}
             <div className="grid gap-2">
               <div>
                 Deposit:{" "}
@@ -131,14 +161,19 @@ export default async function CustomerProjectDetailPage({
               </div>
             </div>
 
-            {/* ✅ Payment buttons */}
             <div className="pt-2 space-y-3">
               {showPayDeposit ? (
-                <PayMilestoneButton projectId={project.id} milestoneType="DEPOSIT" />
+                <PayMilestoneButton
+                  projectId={project.id}
+                  milestoneType="DEPOSIT"
+                />
               ) : null}
 
               {showPayFinal ? (
-                <PayMilestoneButton projectId={project.id} milestoneType="FINAL" />
+                <PayMilestoneButton
+                  projectId={project.id}
+                  milestoneType="FINAL"
+                />
               ) : null}
 
               {!showPayDeposit && !showPayFinal ? (
@@ -148,12 +183,14 @@ export default async function CustomerProjectDetailPage({
               ) : null}
             </div>
 
-            {/* Reviews */}
             <div className="pt-2">
               {project.review ? (
                 <div className="text-[13px]">
                   ✅ Review submitted.{" "}
-                  <Link className="underline" href={`/dashboard/customer/projects`}>
+                  <Link
+                    className="underline"
+                    href="/dashboard/customer/projects"
+                  >
                     Back to projects
                   </Link>
                 </div>
@@ -163,7 +200,8 @@ export default async function CustomerProjectDetailPage({
                 </Link>
               ) : (
                 <div className="text-[13px] text-[var(--muted)]">
-                  Reviews unlock after the project is completed and the final payment is settled.
+                  Reviews unlock after the project is completed and the final
+                  payment is settled.
                 </div>
               )}
             </div>
@@ -175,22 +213,27 @@ export default async function CustomerProjectDetailPage({
           <CardBody className="space-y-3 text-[14px] text-[var(--muted)]">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="font-semibold text-[var(--text)]">Measurements</div>
+                <div className="font-semibold text-[var(--text)]">
+                  Measurements
+                </div>
                 <div className="text-[13px] text-[var(--muted)]">
                   Keep your latest sizes up to date for better fit.
                 </div>
               </div>
-              <Link href="/dashboard/customer/measurements" className="inline-flex">
+              <Link
+                href="/dashboard/customer/measurements"
+                className="inline-flex"
+              >
                 <Button variant="secondary">View</Button>
               </Link>
             </div>
 
             <div className="border-t border-[var(--border)] pt-3">
-              <div className="font-semibold text-[var(--text)]">Project notes</div>
-              <div className="text-[13px] text-[var(--muted)] whitespace-pre-wrap">
-                {(project.details as any)?.customerNotes
-                  ?? (project.details as any)?.notes
-                  ?? "No notes yet."}
+              <div className="font-semibold text-[var(--text)]">
+                Project notes
+              </div>
+              <div className="text-[13px] whitespace-pre-wrap">
+                {details?.fabricNotes?.trim() || "No notes yet."}
               </div>
             </div>
 
@@ -199,20 +242,19 @@ export default async function CustomerProjectDetailPage({
               <div className="text-[13px]">
                 Final submitted:{" "}
                 <span className="font-semibold text-[var(--text)]">
-                  {(project.details as any)?.finalSubmittedAt
-                    ? new Date((project.details as any).finalSubmittedAt).toLocaleString()
-                    : "—"}
+                  {formatDateTime(details?.finalSubmittedAt)}
                 </span>
               </div>
             </div>
-            {project.details?.requireSketch ? (
+
+            {details?.requireSketch ? (
               <div className="border-t border-[var(--border)] pt-3">
                 <div className="font-semibold text-[var(--text)]">Sketch</div>
 
-                {project.details?.sketchImage?.length ? (
+                {sketchImages.length > 0 ? (
                   <div className="mt-3 space-y-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {project.details.sketchImage.map((url, idx) => (
+                      {sketchImages.map((url: string, idx: number) => (
                         <a
                           key={`${url}-${idx}`}
                           href={url}
@@ -231,17 +273,17 @@ export default async function CustomerProjectDetailPage({
                     </div>
 
                     <div className="text-[13px] text-[var(--muted)]">
-                      {project.details.sketchSubmittedAt
-                        ? `Submitted ${new Date(project.details.sketchSubmittedAt).toLocaleString()}`
+                      {details.sketchSubmittedAt
+                        ? `Submitted ${formatDateTime(details.sketchSubmittedAt)}`
                         : "Submitted"}
-                      {project.details.sketchApprovedAt
-                        ? ` • Approved ${new Date(project.details.sketchApprovedAt).toLocaleString()}`
+                      {details.sketchApprovedAt
+                        ? ` • Approved ${formatDateTime(details.sketchApprovedAt)}`
                         : ""}
                     </div>
 
-                    {!project.details.sketchApprovedAt &&
-                    project.details.sketchSubmittedAt &&
-                    project.details.sketchImage.length > 0 ? (
+                    {!details.sketchApprovedAt &&
+                    details.sketchSubmittedAt &&
+                    sketchImages.length > 0 ? (
                       <div className="pt-1">
                         <ApproveSketchButton projectId={project.id} />
                       </div>
@@ -255,13 +297,62 @@ export default async function CustomerProjectDetailPage({
               </div>
             ) : null}
 
+            {details?.finalImages?.length ? (
+              <div className="border-t border-[var(--border)] pt-3">
+                <div className="font-semibold text-[var(--text)]">Final garment photos</div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  {details.finalImages.map((url: string, idx: number) => (
+                    <a
+                      key={`${url}-${idx}`}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Final photo ${idx + 1}`}
+                        className="w-full object-cover"
+                      />
+                  </a>
+                ))}
+                </div>
+                {details.finalApprovedAt ? (
+                  <div className="mt-2 text-[12px] text-green-600 font-medium">
+                    ✓ Approved {new Date(details.finalApprovedAt).toLocaleDateString()}
+                  </div>
+                ) : (
+                  <div className="mt-2 text-[12px] text-[var(--muted)]">
+                    Awaiting your approval before shipping.
+                  </div>
+                )}
+              </div>
+            ) : null}
+
             {project.projectShipping ? (
               <div className="border-t border-[var(--border)] pt-3">
                 <div className="font-semibold text-[var(--text)]">Shipping</div>
                 <div className="text-[13px]">
                   Carrier:{" "}
                   <span className="font-semibold text-[var(--text)]">
-                    {project.projectShipping.carrier?.name ?? "—"}
+                    {project.projectShipping.carrier?.name ??
+                      project.projectShipping.carrierOther ??
+                      "—"}
+                  </span>
+                </div>
+
+                <div className="text-[13px]">
+                  Tracking number:{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {project.projectShipping.trackingNumber ?? "—"}
+                  </span>
+                </div>
+
+                <div className="text-[13px]">
+                  Shipped at:{" "}
+                  <span className="font-semibold text-[var(--text)]">
+                    {formatDateTime(project.projectShipping.shippedAt)}
                   </span>
                 </div>
               </div>

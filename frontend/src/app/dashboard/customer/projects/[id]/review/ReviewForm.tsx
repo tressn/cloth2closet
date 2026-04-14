@@ -93,17 +93,45 @@ export default function ReviewForm({ projectId }: { projectId: string }) {
     try {
       if (text.trim().length > 1500) throw new Error("Review is too long (max 1500 characters).");
 
-      if (uploads.some((u) => u.status === "queued")) {
-        await uploadAllQueued();
-      }
-      if (uploads.some((u) => u.status === "error")) {
-        throw new Error("One or more photos failed to upload. Remove them or try again.");
+      // ✅ Upload and collect URLs directly — don't rely on state memo
+      const collectedUrls: string[] = [];
+
+      for (let i = 0; i < uploads.length; i++) {
+        const item = uploads[i];
+
+        if (item.status === "done" && item.publicUrl) {
+          collectedUrls.push(item.publicUrl);
+          continue;
+        }
+
+        if (item.status !== "queued") continue;
+
+        setUploads((prev) =>
+          prev.map((u, idx) => (idx === i ? { ...u, status: "uploading" } : u))
+        );
+
+        try {
+          const { uploadUrl, publicUrl } = await presignReviewUpload(projectId, item.file);
+          await putToS3(uploadUrl, item.file);
+          collectedUrls.push(publicUrl);
+          setUploads((prev) =>
+            prev.map((u, idx) => (idx === i ? { ...u, status: "done", publicUrl } : u))
+          );
+        } catch (e: any) {
+          setUploads((prev) =>
+            prev.map((u, idx) =>
+              idx === i ? { ...u, status: "error", error: e?.message ?? "Upload error" } : u
+            )
+          );
+          throw new Error("One or more photos failed to upload. Remove them or try again.");
+        }
       }
 
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, rating, text: text.trim(), photoUrls }),
+        // ✅ Use collectedUrls directly, not the stale memo
+        body: JSON.stringify({ projectId, rating, text: text.trim(), photoUrls: collectedUrls }),
       });
 
       const data = await res.json().catch(() => ({}));

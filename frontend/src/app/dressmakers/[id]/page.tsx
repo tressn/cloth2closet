@@ -74,7 +74,7 @@ export default async function DressmakerPublicPage({
         photoUrls: true,
         isVerified: true,
         createdAt: true,
-        author: { select: { name: true } },
+        author: { select: { name: true, username: true } },
         project: { select: { projectCode: true } },
       },
     }),
@@ -230,7 +230,7 @@ export default async function DressmakerPublicPage({
                         <div key={r.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
                           <div className="flex items-center justify-between gap-3">
                             <div className="text-[13px] font-semibold text-[var(--text)]">
-                              {r.author?.name ?? "Customer"} • {r.rating}/5
+                              {r.author?.username ?? r.author?.name ?? "Customer"} • {r.rating}/5
                               {r.isVerified ? <span className="ml-2 text-[12px] text-[var(--muted)]">✅ verified</span> : null}
                             </div>
                             <div className="text-[12px] text-[var(--muted)]">
@@ -254,7 +254,7 @@ export default async function DressmakerPublicPage({
                                   rel="noreferrer"
                                   className="block overflow-hidden rounded-lg border"
                                 >
-                                  <div className="aspect-square overflow-hidden leading-none">
+                                  <div className="overflow-hidden leading-none">
                                     <img
                                       src={url}
                                       alt="Review photo"

@@ -330,27 +330,6 @@ export default function FAQPage() {
               deposits, sharing project details, shipping, reviews, and getting
               support.
             </p>
-
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/dressmakers"
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[14px] font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              >
-                Browse designers
-              </Link>
-              <Link
-                href="/messages"
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[14px] font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              >
-                Open messages
-              </Link>
-              <Link
-                href="/support"
-                className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[14px] font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-              >
-                Contact support
-              </Link>
-            </div>
           </div>
 
           <div className="space-y-6">

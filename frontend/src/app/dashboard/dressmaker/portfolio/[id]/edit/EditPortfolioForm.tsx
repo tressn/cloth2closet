@@ -352,12 +352,12 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="grid gap-2">
+    <div className="grid gap-2">
       <div className="text-[12px] font-medium text-[var(--muted)]">{label}</div>
       {children}
       {hint ? (
         <div className="text-[12px] leading-5 text-[var(--muted)]">{hint}</div>
       ) : null}
-    </label>
+    </div>
   );
 }

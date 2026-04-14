@@ -19,11 +19,15 @@ export default function QuoteForm({
   existingAmount,
   currency,
   existingDepositPercent,
+  depositAlreadyPaid = false,
+  depositPaidAmount = null,
 }: {
   projectId: string;
   existingAmount: number | null;
   currency: string;
   existingDepositPercent?: number | null;
+  depositAlreadyPaid?: boolean;
+  depositPaidAmount?: number | null;
 }) {
   const [amountInput, setAmountInput] = useState(centsToInputValue(existingAmount));
   const [depositPercent, setDepositPercent] = useState(
@@ -56,11 +60,33 @@ export default function QuoteForm({
   const percentOk =
     Number.isFinite(parsedPercent) && parsedPercent >= 25 && parsedPercent <= 75;
 
-  const depositDollars = useMemo(() => {
+  // When deposit already paid, preview shows remaining balance
+  // When not yet paid, preview shows deposit amount
+  const previewData = useMemo(() => {
     if (!Number.isFinite(amountDollars) || amountDollars <= 0) return null;
+
+    if (depositAlreadyPaid && depositPaidAmount != null) {
+      // ✅ depositPaidAmount is in cents, convert to dollars
+      const depositDollars = depositPaidAmount / 100;
+      const remainingDollars = amountDollars - depositDollars;
+      if (remainingDollars <= 0) return null;
+      return {
+        label: "Remaining balance customer owes",
+        amount: remainingDollars,
+        // ✅ Show the breakdown clearly without mentioning percent
+        sub: `New total ${formatDollars(amountDollars, currency)} − deposit paid ${formatDollars(depositDollars, currency)}`,
+      };
+    }
+
+    // Not yet paid — show deposit preview with percent
     if (!percentOk) return null;
-    return (amountDollars * parsedPercent) / 100;
-  }, [amountDollars, parsedPercent, percentOk]);
+    const depositDollars = (amountDollars * parsedPercent) / 100;
+    return {
+      label: "Deposit customer pays now",
+      amount: depositDollars,
+      sub: `${parsedPercent}% of ${formatDollars(amountDollars, currency)}`,
+    };
+  }, [amountDollars, parsedPercent, percentOk, depositAlreadyPaid, depositPaidAmount, currency]);
 
   async function submit() {
     setLoading(true);
@@ -68,15 +94,15 @@ export default function QuoteForm({
 
     try {
       if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
-        throw new Error("Enter a valid quote amount.");
+        throw new Error("Enter a valid amount.");
       }
 
-      if (!percentOk) {
+      if (!depositAlreadyPaid && !percentOk) {
         throw new Error("Deposit percent must be between 25 and 75.");
       }
 
       const res = await fetch(`/api/projects/${projectId}/quote`, {
-        method: "POST",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           quotedTotalAmount: amountInCents,
@@ -88,6 +114,7 @@ export default function QuoteForm({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Failed");
 
+      setMsg(depositAlreadyPaid ? "Invoice updated." : "Quote sent.");
       window.location.reload();
     } catch (e: any) {
       setMsg(e?.message ?? "Failed");
@@ -100,7 +127,7 @@ export default function QuoteForm({
     <div className="grid max-w-md gap-4">
       <label className="grid gap-2">
         <div className="text-[12px] font-medium text-[var(--muted)]">
-          Total quote
+          {depositAlreadyPaid ? "New total (including shipping and any extras)" : "Total quote"}
         </div>
         <Input
           value={amountInput}
@@ -109,44 +136,49 @@ export default function QuoteForm({
           inputMode="decimal"
         />
         <div className="text-[12px] leading-5 text-[var(--muted)]">
-          Enter the full amount the customer will see.
+          {depositAlreadyPaid
+            ? "Enter the updated full project total. The customer will pay the difference."
+            : "Enter the full amount the customer will pay in total."}
         </div>
       </label>
 
-      <label className="grid gap-2">
-        <div className="text-[12px] font-medium text-[var(--muted)]">
-          Deposit percent
-        </div>
-        <Input
-          value={depositPercent}
-          onChange={(e) => setDepositPercent(e.target.value)}
-          placeholder="50"
-          inputMode="numeric"
-        />
-        <div className="text-[12px] leading-5 text-[var(--muted)]">
-          This is the portion the customer pays now.
-        </div>
-        {!percentOk ? (
-          <div className="text-[12px] text-[var(--danger)]">
-            Deposit must be between 25% and 75%.
+      {/* ✅ Only show deposit percent when deposit not yet paid */}
+      {!depositAlreadyPaid ? (
+        <label className="grid gap-2">
+          <div className="text-[12px] font-medium text-[var(--muted)]">
+            Deposit percent
           </div>
-        ) : null}
-      </label>
+          <Input
+            value={depositPercent}
+            onChange={(e) => setDepositPercent(e.target.value)}
+            placeholder="50"
+            inputMode="numeric"
+          />
+          <div className="text-[12px] leading-5 text-[var(--muted)]">
+            Portion the customer pays upfront (25–75%).
+          </div>
+          {!percentOk ? (
+            <div className="text-[12px] text-[var(--danger)]">
+              Deposit must be between 25% and 75%.
+            </div>
+          ) : null}
+        </label>
+      ) : null}
 
-      {depositDollars != null && Number.isFinite(amountDollars) && percentOk ? (
+      {/* ✅ Preview shows remaining balance when deposit paid, deposit amount otherwise */}
+      {previewData ? (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
           <div className="text-[12px] uppercase tracking-wide text-[var(--muted)]">
-            Payment preview
+            {depositAlreadyPaid ? "Updated balance" : "Payment preview"}
           </div>
           <div className="mt-2 text-[14px] text-[var(--text)]">
-            Customer pays now:{" "}
+            {previewData.label}:{" "}
             <span className="font-semibold">
-              {formatDollars(depositDollars, currency)}
+              {formatDollars(previewData.amount, currency)}
             </span>
           </div>
-          <div className="mt-1 text-[13px] text-[var(--muted)]">
-            {parsedPercent}% of {formatDollars(amountDollars, currency)}
-          </div>
+          {/* ✅ Only show the sub line — no percent shown when deposit already paid */}
+          <div className="mt-1 text-[13px] text-[var(--muted)]">{previewData.sub}</div>
         </div>
       ) : null}
 
@@ -155,10 +187,14 @@ export default function QuoteForm({
         <Button
           type="button"
           onClick={submit}
-          disabled={loading || !amountInput.trim() || !depositPercent.trim() || !percentOk}
+          disabled={loading || !amountInput.trim() || (!depositAlreadyPaid && !percentOk)}
           variant="primary"
         >
-          {loading ? "Saving…" : "Save quote"}
+          {loading
+            ? "Saving…"
+            : depositAlreadyPaid
+            ? "Update invoice"
+            : "Send quote"}
         </Button>
       </div>
     </div>

@@ -15,7 +15,13 @@ export default async function DressmakerProjectsPage() {
   const projects = await prisma.project.findMany({
     where: { dressmakerId: session.user.id },
     orderBy: { updatedAt: "desc" },
-    include: { details: true, projectShipping: true },
+    include: { 
+      details: true, 
+      projectShipping: true,
+      customer: {
+        select: { name: true, username: true }, 
+      },
+    },
   });
 
   return (
@@ -35,7 +41,9 @@ export default async function DressmakerProjectsPage() {
                     <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-5 py-4 hover:bg-[var(--surface-2)]">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <div className="text-[15px] font-semibold text-[var(--text)]">{p.projectCode}</div>
+                          <div className="text-[15px] font-semibold text-[var(--text)]">{p.title ?? p.projectCode}</div>
+                          <div className="mt-1 text-[13px] text-[var(--muted)]">ProjectID: {p.projectCode} </div>
+                          <div className="mt-1 text-[13px] text-[var(--muted)]">Customer: {p.customer.name ?? p.customer.username ?? "Customer"} </div>
                           <div className="mt-1 text-[13px] text-[var(--muted)]">Status: {p.status}</div>
                         </div>
                         <Badge tone="neutral">

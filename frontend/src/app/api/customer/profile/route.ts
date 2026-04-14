@@ -52,7 +52,7 @@ export async function PATCH(req: Request) {
   const subdivisionCode = subdivisionCodeRaw ? subdivisionCodeRaw.toUpperCase() : "";
 
   // ✅ timezone validation
-  if (timezoneIana && !TIMEZONE_SET.some((t) => t.value === timezoneIana)) {
+  if (timezoneIana && !TIMEZONE_SET.has(timezoneIana)) {
   return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
 }
 
@@ -82,6 +82,7 @@ export async function PATCH(req: Request) {
   const userUpdate: Record<string, any> = {};
   if (body.username !== undefined) userUpdate.username = username || null;
   if (body.name !== undefined) userUpdate.name = name || null;
+  if (body.fullName !== undefined) userUpdate.name = fullName || null; // keep User.name in sync
 
   const profileData: Record<string, any> = {};
   if (body.fullName !== undefined) profileData.fullName = fullName || null;

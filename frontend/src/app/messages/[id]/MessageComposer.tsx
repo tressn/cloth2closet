@@ -199,8 +199,8 @@ export default function MessageComposer({
       setText("");
       setUploads([]);
 
-      router.refresh();
       window.dispatchEvent(new Event("c2c:message-sent"));
+      router.refresh();
     } catch (e: any) {
       setError(e?.message ?? "Failed to send");
     } finally {

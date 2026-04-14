@@ -10,7 +10,6 @@ function asString(value: unknown): string | null {
 
 function parseDateOnly(value: unknown): Date | null {
   if (typeof value !== "string" || !value) return null;
-
   const d = new Date(`${value}T00:00:00`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -41,6 +40,17 @@ export async function POST(req: Request) {
   const wantsCalico = Boolean(body?.wantsCalico);
   const requireSketch = Boolean(body?.requireSketch);
 
+  const shipByDateRaw = body?.shipByDate;
+  const shipByDate = shipByDateRaw ? parseDateOnly(shipByDateRaw) : null;
+
+  const colorPreferences = asString(body?.colorPreferences);
+  const sizeNotes = asString(body?.sizeNotes);
+
+const budgetCeiling =
+  typeof body?.budgetCeiling === "number" && Number.isFinite(body.budgetCeiling)
+    ? Math.max(0, Math.round(body.budgetCeiling))
+    : null;
+
   if (!dressmakerProfileId) {
     return NextResponse.json({ error: "dressmakerProfileId is required" }, { status: 400 });
   }
@@ -55,7 +65,7 @@ export async function POST(req: Request) {
 
   if (eventDate && isPastDateOnly(eventDate)) {
     return NextResponse.json(
-      { error: "Event date can’t be in the past." },
+      { error: "Event date can't be in the past." },
       { status: 400 }
     );
   }
@@ -102,60 +112,66 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("\n");
 
-  const project = await prisma.project.create({
-    data: {
-      projectCode,
-      status: ProjectStatus.REQUESTED,
-      title,
-      customerId: session.user.id,
-      dressmakerId: dm.userId,
-      details: {
-        create: {
-          eventDate,
-          fabricNotes,
-          referenceImages: [],
-          sketchImage: [],
-          isRush,
-          wantsCalico,
-          requireSketch,
-          finalImages: [],
-          measurementsRequested: [],
+  try {
+    const project = await prisma.project.create({
+      data: {
+        projectCode,
+        status: ProjectStatus.REQUESTED,
+        title,
+        customerId: session.user.id,
+        dressmakerId: dm.userId,
+        details: {
+          create: {
+            eventDate,
+            shipByDate,
+            fabricNotes,
+            colorPreferences,
+            sizeNotes,
+            budgetCeiling,
+            referenceImages: [],
+            isRush,
+            wantsCalico,
+            requireSketch,
+            finalImages: [],
+            measurementsRequested: [],
+          },
         },
       },
-    },
-  });
+    });
 
-  const convo = await prisma.conversation.upsert({
-    where: { projectId: project.id },
-    update: {},
-    create: {
-      projectId: project.id,
-      customerId: session.user.id,
-      dressmakerId: dm.userId,
-      messages: {
-        create: {
-          senderId: session.user.id,
-          text: intro,
-          attachments: [],
+    const convo = await prisma.conversation.create({
+      data: {
+        projectId: project.id,
+        customerId: session.user.id,
+        dressmakerId: dm.userId,
+        messages: {
+          create: {
+            senderId: session.user.id,
+            text: intro,
+            attachments: [],
+          },
         },
       },
-    },
-  });
+    });
 
-  await prisma.notification.create({
-    data: {
-      userId: dm.userId,
-      type: "QUOTE_REQUESTED",
-      title: "New quote request",
-      body: title,
-      href: `/dashboard/dressmaker/quotes`,
+    await prisma.notification.create({
+      data: {
+        userId: dm.userId,
+        type: "QUOTE_REQUESTED",
+        title: "New quote request",
+        body: title,
+        href: `/dashboard/dressmaker/quotes`,
+        projectId: project.id,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
       projectId: project.id,
-    },
-  });
-
-  return NextResponse.json({
-    ok: true,
-    projectId: project.id,
-    conversationId: convo.id,
-  });
+      conversationId: convo.id,
+    });
+  } catch (e: any) {
+    console.error("[POST /api/projects]", e);
+    return NextResponse.json({ error: e?.message ?? "Server error" }, { status: 500 });
+  }
 }
