@@ -135,6 +135,9 @@ model User {
   username     String? @unique
   passwordHash String?
 
+  termsAcceptedAt      DateTime?
+  termsAcceptedVersion String?
+
   role Role?
 
   sessions Session[]
@@ -531,6 +534,10 @@ model Milestone {
   // Transfer (1:1 optional) — you already have this
   transfer Transfer?
 
+  platformFeeAmount Int?   // your fee for this milestone
+  shippingAmount    Int?   // only used when shipping is included in this milestone
+  transferGroup     String? // Stripe reconciliation key
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -704,6 +711,7 @@ model ProjectShipping {
   carrierOther   String?
   trackingNumber String?
   shippedAt      DateTime?
+  quotedAmount   Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
