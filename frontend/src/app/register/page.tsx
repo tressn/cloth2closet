@@ -183,7 +183,20 @@ export default function RegisterPage() {
                 )}
 
                 {err ? <div className="text-[13px] text-[var(--danger)]">{err}</div> : null}
-
+                <label className="flex items-start gap-2 text-[13px] text-[var(--muted)]">
+                  <input
+                    type="checkbox"
+                    required
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <a href="/terms" target="_blank" className="underline text-[var(--plum-600)]">
+                      Terms of Service
+                    </a>
+                    . I understand that deposits are non-refundable once a project begins.
+                  </span>
+                </label>
                 <Button
                   type="button"
                   onClick={submit}

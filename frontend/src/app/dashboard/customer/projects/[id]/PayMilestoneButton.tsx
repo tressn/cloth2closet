@@ -48,6 +48,11 @@ export default function PayMilestoneButton({ projectId, milestoneType, disabled 
         {loading ? "Opening Stripe Checkout..." : label}
       </Button>
       {error ? <div className="text-[13px] text-red-600">{error}</div> : null}
+      <p className="text-[12px] text-[var(--muted)]">
+        By paying you confirm the deposit is non-refundable and agree to our{" "}
+        <a href="/terms" className="underline">Terms of Service</a>.
+      </p>
+      <p></p>
     </div>
   );
 }

@@ -102,7 +102,6 @@ export default async function CustomerProjectDetailPage({
       subtitle={`${project.projectCode} · By ${dressmakerDisplayName}`}
       tabs={[
         { label: "Back to projects", href: "/dashboard/customer/projects" },
-        { label: "Measurements", href: "/dashboard/customer/measurements" },
       ]}
     >
       <div className="max-w-4xl space-y-6">
@@ -333,7 +332,7 @@ export default async function CustomerProjectDetailPage({
             <div className="border-t border-[var(--border)] pt-3">
               <div className="font-semibold text-[var(--text)]">Key dates</div>
               <div className="text-[13px]">
-                Final submitted:{" "}
+                Final garment submitted:{" "}
                 <span className="font-semibold text-[var(--text)]">
                   {formatDateTime(details?.finalSubmittedAt)}
                 </span>
