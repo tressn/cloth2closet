@@ -96,6 +96,7 @@ const budgetCeiling =
     `Project: ${projectCode}`,
     "",
     `Event date: ${eventDate ? eventDate.toDateString() : "Not set"}`,
+    `Ship-by date: ${shipByDate ? shipByDate.toDateString() : "Not set"}`,
     `Rush: ${isRush ? "Yes" : "No"}`,
     `Calico mockup: ${wantsCalico ? "Yes" : "No"}`,
     `Sketch approval required: ${requireSketch ? "Yes" : "No"}`,

@@ -208,6 +208,99 @@ export default async function CustomerProjectDetailPage({
           </CardBody>
         </Card>
 
+        {/* ✅ Your request summary — mirrors what the dressmaker sees */}
+        <Card>
+          <CardHeader
+            title="Your request"
+            subtitle="What you submitted to the dressmaker."
+          />
+          <CardBody className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  label: "Event date",
+                  value: details?.eventDate
+                    ? new Date(details.eventDate).toLocaleDateString()
+                    : "—",
+                },
+                {
+                  label: "Ship-by date",
+                  value: details?.shipByDate
+                    ? new Date(details.shipByDate).toLocaleDateString()
+                    : "—",
+                },
+                {
+                  label: "Budget ceiling",
+                  value:
+                    details?.budgetCeiling != null
+                      ? formatMoney(details.budgetCeiling, project.currency)
+                      : "—",
+                },
+                {
+                  label: "Color preferences",
+                  value: details?.colorPreferences?.trim() || "—",
+                },
+                {
+                  label: "Size notes",
+                  value: details?.sizeNotes?.trim() || "—",
+                },
+                { label: "Rush order", value: details?.isRush ? "Yes" : "No" },
+                { label: "Calico mockup", value: details?.wantsCalico ? "Yes" : "No" },
+                { label: "Sketch required", value: details?.requireSketch ? "Yes" : "No" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+                >
+                  <div className="text-[12px] uppercase tracking-wide text-[var(--muted)]">
+                    {item.label}
+                  </div>
+                  <div className="mt-1 whitespace-pre-wrap text-[14px] font-medium text-[var(--text)]">
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {details?.fabricNotes?.trim() ? (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div className="text-[12px] uppercase tracking-wide text-[var(--muted)]">
+                  Your notes to the dressmaker
+                </div>
+                <div className="mt-2 whitespace-pre-wrap text-[14px] leading-6 text-[var(--text)]">
+                  {details.fabricNotes.trim()}
+                </div>
+              </div>
+            ) : null}
+
+            {details?.referenceImages?.length ? (
+              <div>
+                <div className="mb-3 text-[12px] uppercase tracking-wide text-[var(--muted)]">
+                  Reference images you sent
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {details.referenceImages.slice(0, 6).map((url: string, idx: number) => (
+                    <a
+                      key={`${url}-${idx}`}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Reference ${idx + 1}`}
+                        className="h-40 w-full object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </CardBody>
+        </Card>
+
         <Card>
           <CardHeader title="Details" subtitle="Key info for quoting + fit." />
           <CardBody className="space-y-3 text-[14px] text-[var(--muted)]">

@@ -134,21 +134,9 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
     const cleanTitle = title.trim();
     const cleanNotes = notes.trim();
 
-    if (!cleanTitle) {
-      setMsg("Please add a title.");
-      return;
-    }
-
-    if (eventDateError || shipByDateError) {
-      setMsg(eventDateError || shipByDateError);
-      return;
-    }
-
-    if (
-      eventDate &&
-      shipByDate &&
-      new Date(`${shipByDate}T00:00:00`) > new Date(`${eventDate}T00:00:00`)
-    ) {
+    if (!cleanTitle) { setMsg("Please add a title."); return; }
+    if (eventDateError || shipByDateError) { setMsg(eventDateError || shipByDateError); return; }
+    if (eventDate && shipByDate && new Date(`${shipByDate}T00:00:00`) > new Date(`${eventDate}T00:00:00`)) {
       setMsg("Ship-by date must be on or before the event date.");
       return;
     }
@@ -187,27 +175,47 @@ export default function RequestForm({ dressmakerProfileId }: { dressmakerProfile
 
       const conversationId: string = data.conversationId;
 
-      if (uploads.some((u) => u.status === "queued")) {
-        await uploadAllQueued(conversationId);
+      // ✅ Collect URLs directly — never rely on stale memo
+      const collectedUrls: string[] = [];
+
+      for (let i = 0; i < uploads.length; i++) {
+        const u = uploads[i];
+        if (u.status === "done" && u.publicUrl) {
+          collectedUrls.push(u.publicUrl);
+          continue;
+        }
+        if (u.status !== "queued") continue;
+
+        setUploads((prev) =>
+          prev.map((x, idx) => (idx === i ? { ...x, status: "uploading" } : x))
+        );
+
+        try {
+          const { uploadUrl, publicUrl } = await presignMessageUpload(conversationId, u.file);
+          await putToS3(uploadUrl, u.file);
+          collectedUrls.push(publicUrl);
+          setUploads((prev) =>
+            prev.map((x, idx) => (idx === i ? { ...x, status: "done", publicUrl } : x))
+          );
+        } catch (e: any) {
+          setUploads((prev) =>
+            prev.map((x, idx) =>
+              idx === i ? { ...x, status: "error", error: e?.message ?? "Upload error" } : x
+            )
+          );
+          throw new Error("One or more photos failed to upload. Remove them or try again.");
+        }
       }
 
-      if (uploads.some((u) => u.status === "error")) {
-        throw new Error("One or more photos failed to upload. Remove them or try again.");
-      }
-
-      if (attachments.length > 0) {
+      // ✅ Send photos as a message only if we actually have URLs
+      if (collectedUrls.length > 0) {
         const photoMsg =
-          `Reference photos for: ${cleanTitle}\n` +
-          `• Event date: ${eventDate || "Not set"}\n` +
-          `• Ship-by date: ${shipByDate || "Not set"}\n` +
-          `• Rush: ${isRush ? "Yes" : "No"}\n` +
-          `• Calico: ${wantsCalico ? "Yes" : "No"}\n` +
-          `• Sketch approval: ${requireSketch ? "Yes" : "No"}`;
+          `Reference photos for: ${cleanTitle}\n`
 
         const res2 = await fetch(`/api/conversations/${conversationId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: photoMsg, attachments }),
+          body: JSON.stringify({ text: photoMsg, attachments: collectedUrls }),
         });
 
         const data2 = await res2.json().catch(() => ({}));

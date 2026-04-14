@@ -6,8 +6,10 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import ProfileForm from "./ProfileForm";
 import PublishToggle from "./PublishToggle";
+import PauseToggle from "./PauseToggle";
 import SetupPayoutButton from "./SetupPayoutButton";
 import RequestReviewButton from "./RequestReviewButton";
+
 
 
 export default async function DressmakerProfilePage() {
@@ -79,6 +81,12 @@ export default async function DressmakerProfilePage() {
                 approvalStatus={profile.approvalStatus}
                 rejectionReason={profile.rejectionReason}
               />
+
+              {profile.approvalStatus === "APPROVED" && profile.isPublished ? (
+                <div className="mt-4 border-t border-[var(--border)] pt-4">
+                  <PauseToggle initialPaused={profile.isPaused} />
+                </div>
+              ) : null}
 
               {profile.approvalStatus === "REJECTED" ? (
                 <div className="mt-3">

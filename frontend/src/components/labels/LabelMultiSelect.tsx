@@ -200,7 +200,7 @@ export default function LabelMultiSelect(props: {
           {selectedLabels.map((label) => (
             <span
               key={labelKey(label)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5"
+              className="inline-flex items-center gap-2"
             >
               <Badge tone={label.status === "APPROVED" ? "neutral" : "featured"}>
                 {label.name}

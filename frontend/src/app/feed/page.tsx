@@ -252,7 +252,7 @@ export default async function FeedPage() {
                           <a key={`${url}-${idx}`} href={url} target="_blank" rel="noreferrer"
                             className="block overflow-hidden rounded-xl border border-[var(--border)]">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={`Review photo ${idx + 1}`} className="h-24 w-full object-cover" />
+                            <img src={url} alt={`Review photo ${idx + 1}`} className="aspect-[4/5] w-full object-cover" />
                           </a>
                         ))}
                       </div>
