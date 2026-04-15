@@ -35,10 +35,6 @@ export async function POST(req: Request) {
       if (!username || username.length < 3) {
         return NextResponse.json({ error: "Username is required (min 3 chars)." }, { status: 400 });
       }
-
-      if (!fullName) {
-        return NextResponse.json({ error: "Full name is required." }, { status: 400 });
-      }
     }
 
     const countryCode = (body.countryCode ?? "").toUpperCase().trim();
