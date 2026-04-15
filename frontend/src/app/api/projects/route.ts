@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { ProjectStatus } from "@prisma/client";
-import { checkSuspended } from "@/lib/checkSuspended";
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -22,14 +21,10 @@ function isPastDateOnly(date: Date) {
 }
 
 export async function POST(req: Request) {
-  console.log("=== PROJECTS ROUTE HIT ===")
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-
-  const blocked = await checkSuspended(session.user.id);
-  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({}));
 
