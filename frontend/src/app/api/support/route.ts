@@ -49,47 +49,45 @@ export async function POST(req: Request) {
     if (!isValidEmail(requesterEmail)) return bad("Please enter a valid email.", 400);
   }
 
-  // Attachments are more sensitive: require auth + projectId + authorization
-  if (attachmentUrls.length > 0) {
-    if (!userId) return bad("Please sign in to attach images for security.", 401);
-    if (!projectId) return bad("Project ID is required for attachments.", 400);
+  // ── Resolve project (user may type projectCode or internal id) ──
+  let resolvedProjectId: string | null = null;
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { id: true, customerId: true, dressmakerId: true },
-    });
-    if (!project) return bad("Project not found", 404);
-
-    const isAdmin = session?.user?.role === "ADMIN";
-    const isParty = project.customerId === userId || project.dressmakerId === userId;
-    if (!isParty && !isAdmin) return bad("Forbidden", 403);
-  } else {
-    // If projectId provided, keep your existing access check for logged-in users
-    if (projectId && userId) {
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
+    if (projectId) {
+      const project = await prisma.project.findFirst({
+        where: {
+          OR: [{ id: projectId }, { projectCode: projectId }],
+        },
         select: { id: true, customerId: true, dressmakerId: true },
       });
+
       if (!project) return bad("Project not found", 404);
 
-      const isAdmin = session?.user?.role === "ADMIN";
-      const isParty = project.customerId === userId || project.dressmakerId === userId;
-      if (!isParty && !isAdmin) return bad("Forbidden", 403);
-    }
-  }
+      if (userId) {
+        const isAdmin = session?.user?.role === "ADMIN";
+        const isParty = project.customerId === userId || project.dressmakerId === userId;
+        if (!isParty && !isAdmin) return bad("Forbidden", 403);
+      }
 
-  const ticket = await prisma.supportTicket.create({
-    data: {
-      userId, // null for guests
-      requesterEmail, // email for guests; fine to store for logged-in too
-      projectId: projectId || null,
-      category,
-      subject,
-      message,
-      attachmentUrls,
-      status: "OPEN",
-    },
-  });
+      resolvedProjectId = project.id;
+    }
+
+    if (attachmentUrls.length > 0) {
+      if (!userId) return bad("Please sign in to attach images for security.", 401);
+      if (!resolvedProjectId) return bad("Project ID is required for attachments.", 400);
+    }
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        userId,
+        requesterEmail,
+        projectId: resolvedProjectId,
+        category,
+        subject,
+        message,
+        attachmentUrls,
+        status: "OPEN",
+      },
+    });
 
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
   if (admins.length) {
