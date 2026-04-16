@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 type Role = "CUSTOMER" | "DRESSMAKER" | "ADMIN";
-type Status = "ACTIVE" | "SUSPENDED";
+type Status = "ACTIVE" | "SUSPENDED" | "PENDING_EMAIL_VERIFICATION";
 
 export default function UserRowActions({
   userId,
@@ -57,6 +57,8 @@ export default function UserRowActions({
       >
         <option value="ACTIVE">ACTIVE</option>
         <option value="SUSPENDED">SUSPENDED</option>
+        <option value="PENDING_EMAIL_VERIFICATION">PENDING_EMAIL_VERIFICATION</option>
+
       </select>
 
       <button
