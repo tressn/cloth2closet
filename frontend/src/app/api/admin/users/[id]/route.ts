@@ -17,7 +17,7 @@ export async function PATCH(
 
   const roleOk =
     role === null || ["CUSTOMER", "DRESSMAKER", "ADMIN"].includes(role);
-  const statusOk = ["PENDING_EMAIL_VERIFICATION", "ACTIVE", "SUSPENDED"].includes(status);
+  const statusOk = ["ACTIVE", "SUSPENDED"].includes(status);
 
   if (!roleOk) return new Response("Invalid role", { status: 400 });
   if (!statusOk) return new Response("Invalid status", { status: 400 });
