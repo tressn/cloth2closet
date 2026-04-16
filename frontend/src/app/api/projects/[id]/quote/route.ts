@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { MilestoneStatus } from "@prisma/client";
+import { checkSuspended } from "@/lib/checkSuspended";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -10,8 +11,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const blocked = await checkSuspended(session.user.id);
+  if (blocked) return blocked;
 
+  const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id },
     include: { payment: true, milestones: true },

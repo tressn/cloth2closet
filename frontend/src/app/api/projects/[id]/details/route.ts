@@ -21,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const details =
     project.details ??
     (await prisma.projectDetails.create({
-      data: { projectId: project.id, referenceImages: [], sketchImage: [] },
+      data: { projectId: project.id, referenceImages: []},
     }))
 
   const data: any = {}
@@ -41,11 +41,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       : []
   }
 
-  if ("sketchImage" in body) {
-    data.sketchImage = Array.isArray(body.sketchImage)
-      ? body.sketchImage.map((u: any) => String(u).trim()).filter(Boolean)
-      : []
-  }
 
   const updated = await prisma.projectDetails.update({
     where: { id: details.id },

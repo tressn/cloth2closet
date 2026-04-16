@@ -19,14 +19,14 @@ export function Card({
   );
 }
 
-export function CardBody({ 
-  children, 
-  className = "", 
-}: { 
+export function CardBody({
+  children,
+  className = "",
+}: {
   children: React.ReactNode;
   className?: string;
- }) {
-  return <div className="px-6 py-6">{children}</div>;
+}) {
+  return <div className={["px-6 py-6", className].join(" ")}>{children}</div>;
 }
 
 export function CardHeader({

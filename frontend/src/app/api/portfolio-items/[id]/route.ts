@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
-import { AttireType, LabelScope } from "@prisma/client";
+import { AttireType, LabelScope, LabelStatus } from "@prisma/client";
 
 function normalizeName(name: string) {
   return name.trim().replace(/\s+/g, " ");
@@ -118,9 +118,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
 
     if (nextLabelIds !== undefined) {
-      // ✅ Only attach existing portfolio labels
+
       const existingLabels = await tx.label.findMany({
-        where: { id: { in: nextLabelIds }, scope: LabelScope.PORTFOLIO },
+        where: {
+          id: { in: nextLabelIds },
+          scope: LabelScope.PORTFOLIO,
+          status: { in: [LabelStatus.APPROVED, LabelStatus.PENDING] },
+        },
         select: { id: true },
       });
 

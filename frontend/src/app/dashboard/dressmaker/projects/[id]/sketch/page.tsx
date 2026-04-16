@@ -21,6 +21,7 @@ export default async function DressmakerSketchPage({
     where: { id },
     include: {
       details: true,
+      sketchSubmission: true,
     },
   });
 
@@ -29,7 +30,7 @@ export default async function DressmakerSketchPage({
     notFound();
   }
 
-  const sketchImages = project.details?.sketchImage ?? [];
+  const sketchImages = project.sketchSubmission?.imageUrls ?? [];
   const sketchSubmittedAt = project.details?.sketchSubmittedAt;
   const sketchApprovedAt = project.details?.sketchApprovedAt;
 
@@ -69,7 +70,7 @@ export default async function DressmakerSketchPage({
             {sketchImages.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                  {sketchImages.map((url, idx) => (
+                  {sketchImages.map((url: string, idx: number) => (
                     <a
                       key={`${url}-${idx}`}
                       href={url}

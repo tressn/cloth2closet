@@ -30,11 +30,11 @@ export function getConversationDisplayMeta(args: {
   const { project, customer, otherParticipant, isProjectConversation } = args;
 
   if (isProjectConversation) {
-    const customerName = displayPersonName(customer, "Customer");
+    const otherName = displayPersonName(otherParticipant, "Customer");
     const projectTitle = project?.title?.trim() || "Custom Outfit";
     return {
       // ✅ Person name as title — short, never overflows
-      title: customerName,
+      title: otherName,
       // ✅ Project title on its own line
       subtitle: projectTitle,
       // ✅ Project code on third line — smallest, truncates safely

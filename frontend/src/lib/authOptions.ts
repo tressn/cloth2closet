@@ -50,12 +50,13 @@ export const authOptions: NextAuthOptions = {
       if (userId) {
         const fresh = await prisma.user.findUnique({
           where: { id: userId },
-          select: { name: true, username: true, role: true },
+          select: { name: true, username: true, role: true, status: true },
         });
         if (fresh) {
           token.name = fresh.name ?? token.name;
           (token as any).username = fresh.username ?? null;
           (token as any).role = fresh.role ?? null;
+          (token as any).status = fresh.status ?? "ACTIVE";
         }
       }
 
@@ -67,6 +68,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = (token as any).id;
         (session.user as any).role = (token as any).role ?? null;
         (session.user as any).username = (token as any).username ?? null;
+        (session.user as any).status = (token as any).status ?? "ACTIVE";
         // Sync name from token so sidebar always has fresh value
         session.user.name = token.name ?? session.user.name;
       }

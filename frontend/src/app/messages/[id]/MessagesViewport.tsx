@@ -7,63 +7,39 @@ export default function MessagesViewport({
 }: {
   children: React.ReactNode;
 }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   function scrollToBottom(behavior: ScrollBehavior = "auto") {
-    const el = containerRef.current;
+    const el = ref.current;
     if (!el) return;
-
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior,
-    });
+    el.scrollTo({ top: el.scrollHeight, behavior });
   }
 
   useLayoutEffect(() => {
-    const id = requestAnimationFrame(() => {
-      scrollToBottom("auto");
-    });
-
+    const id = requestAnimationFrame(() => scrollToBottom("auto"));
     return () => cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {
-    const onSent = () => {
-      requestAnimationFrame(() => scrollToBottom("smooth"));
-    };
-
+    const onSent = () => requestAnimationFrame(() => scrollToBottom("smooth"));
     window.addEventListener("c2c:message-sent", onSent);
     return () => window.removeEventListener("c2c:message-sent", onSent);
   }, []);
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = ref.current;
     if (!el) return;
-
-    const images = Array.from(el.querySelectorAll("img"));
-    if (!images.length) return;
-
-    const handleLoad = () => scrollToBottom("auto");
-
-    images.forEach((img) => {
-      if (!img.complete) {
-        img.addEventListener("load", handleLoad);
-      }
+    const imgs = Array.from(el.querySelectorAll("img"));
+    const onLoad = () => scrollToBottom("auto");
+    imgs.forEach((img) => {
+      if (!img.complete) img.addEventListener("load", onLoad);
     });
-
-    return () => {
-      images.forEach((img) => {
-        img.removeEventListener("load", handleLoad);
-      });
-    };
+    return () => imgs.forEach((img) => img.removeEventListener("load", onLoad));
   }, [children]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 min-h-0 overflow-y-auto pr-1"
-    >
-      <div className="space-y-3">{children}</div>
+    <div ref={ref} className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
+      <div className="space-y-4">{children}</div>
     </div>
   );
 }

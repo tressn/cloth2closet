@@ -248,7 +248,7 @@ export default function MessageComposer({
                 className="relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={u.previewUrl} alt="Upload preview" className="h-28 w-full object-cover" />
+                <img src={u.previewUrl} alt="Upload preview" className="h-28 w-full object-contain bg-[var(--surface-2)]" />
 
                 <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
                   <span className="rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.35)] px-2 py-1 text-[11px] text-white">

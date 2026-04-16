@@ -6,6 +6,11 @@ import { prisma } from "@/lib/prisma";
 function bad(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
 }
+function allowUnpaidReviewsForDev() {
+  // set NEXT_PUBLIC_* would leak to client; keep server-only:
+  // Add to .env.local: ALLOW_UNPAID_REVIEWS="true"
+  return process.env.ALLOW_UNPAID_REVIEWS === "true" && process.env.NODE_ENV !== "production";
+}
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -34,11 +39,15 @@ export async function POST(req: Request) {
   if (!project) return bad("Project not found", 404);
 
   // RULES (verified reviews)
-  // if (project.customerId !== userId) return bad("Forbidden", 403);
-  // if (project.status !== "COMPLETED") return bad("Project must be completed");
+  if (project.customerId !== userId) return bad("Forbidden", 403);
+  if (project.status !== "COMPLETED") return bad("Project must be completed");
   // if (!project.payment || project.payment.status !== "SUCCEEDED") {
   //   return bad("Payment must be settled");
   // }
+  const paymentOk = project.payment?.status === "SUCCEEDED";
+  if (!paymentOk && !allowUnpaidReviewsForDev()) {
+    return bad("Payment must be settled");
+  }
   if (project.review) return bad("Review already exists for this project", 409);
 
   // Create verified review
