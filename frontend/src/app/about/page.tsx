@@ -3,7 +3,7 @@ import { Container } from "@/components/ui/Container";
 export const metadata = {
   title: "About · Cloth2Closet",
   description:
-    "Cloth2Closet is a marketplace connecting customers with skilled dressmakers for custom-made outfits — from first sketch to final stitch.",
+    "Cloth2Closet is a marketplace connecting customers with skilled designers for custom-made outfits — from first sketch to final stitch.",
 };
 
 export default function AboutPage() {
@@ -28,7 +28,7 @@ export default function AboutPage() {
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
               Cloth2Closet is the marketplace that connects you with talented
-              dressmakers, so every outfit is designed, fitted, and crafted
+              designers, so every outfit is designed, fitted, and crafted
               just&nbsp;for&nbsp;you.
             </p>
           </div>
@@ -44,9 +44,9 @@ export default function AboutPage() {
                 Why we exist
               </h2>
               <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">
-                Finding a skilled dressmaker used to mean word-of-mouth referrals and
+                Finding a skilled designers used to mean word-of-mouth referrals and
                 crossed fingers. We built Cloth2Closet to change that — a single
-                place where customers can browse verified dressmakers, request
+                place where customers can browse verified designers, request
                 custom pieces, and manage the entire process from first
                 conversation to final fitting. No guesswork, no loose threads.
               </p>
@@ -69,7 +69,7 @@ export default function AboutPage() {
                 {
                   step: "01",
                   title: "Discover",
-                  body: "Browse dressmaker profiles, portfolios, and verified reviews to find the perfect match for your style.",
+                  body: "Browse dress profiles, portfolios, and verified reviews to find the perfect match for your style.",
                 },
                 {
                   step: "02",
@@ -79,7 +79,7 @@ export default function AboutPage() {
                 {
                   step: "03",
                   title: "Collaborate",
-                  body: "Chat directly with your dressmaker, approve sketches, and track progress through every milestone.",
+                  body: "Chat directly with your designers, approve sketches, and track progress through every milestone.",
                 },
                 {
                   step: "04",
@@ -118,12 +118,12 @@ export default function AboutPage() {
                 {
                   icon: "🔒",
                   title: "Secure payments",
-                  body: "Funds are held safely and released to the dressmaker only when each milestone is completed.",
+                  body: "Funds are held safely and released to the designer only when each milestone is completed.",
                 },
                 {
                   icon: "💬",
                   title: "Built-in messaging",
-                  body: "Chat, share photos, and stay aligned with your dressmaker without leaving the platform.",
+                  body: "Chat, share photos, and stay aligned with your designer without leaving the platform.",
                 },
                 {
                   icon: "✏️",
@@ -143,7 +143,7 @@ export default function AboutPage() {
                 {
                   icon: "📐",
                   title: "Measurement profiles",
-                  body: "Save your measurements once and share them instantly with any dressmaker.",
+                  body: "Save your measurements once and share them instantly with any designer.",
                 },
               ].map((feature) => (
                 <div
@@ -163,15 +163,15 @@ export default function AboutPage() {
           </Container>
         </section>
 
-        {/* ───── For dressmakers ───── */}
+        {/* ───── For designers ───── */}
         <section className="border-b border-[var(--border)] bg-[var(--surface)] py-16 sm:py-20">
           <Container>
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="text-[var(--text-2xl)] font-semibold leading-[var(--lh-2xl)] text-[var(--text)]">
-                For dressmakers
+                For designers
               </h2>
               <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">
-                Cloth2Closet gives independent dressmakers a professional
+                Cloth2Closet gives independent designers a professional
                 storefront, a steady pipeline of clients, and tools to manage
                 projects from quote to delivery. Build your portfolio, set your
                 own prices, and grow your business — we handle payments,
