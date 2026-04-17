@@ -24,11 +24,11 @@ export default function AboutPage() {
               About us
             </p>
             <h1 className="mx-auto mt-4 max-w-2xl text-[clamp(1.75rem,4vw,2.75rem)] font-bold leading-[1.15] tracking-tight text-[var(--text)]">
-              Custom fashion, made&nbsp;personal
+              Fashion: made&nbsp;personal
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
               Cloth2Closet is the marketplace that connects you with talented
-              dressmakers — so every outfit is designed, fitted, and crafted
+              dressmakers, so every outfit is designed, fitted, and crafted
               just&nbsp;for&nbsp;you.
             </p>
           </div>
