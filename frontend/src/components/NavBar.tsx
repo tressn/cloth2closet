@@ -74,6 +74,7 @@ export default function NavBar() {
               )}
               <Link className="hover:text-[var(--text)]" href="/support">Help</Link>
               <Link className="hover:text-[var(--text)]" href="/faq">FAQ</Link>
+              <Link className="hover:text-[var(--text)]" href="/about">About</Link>
             </nav>
           </div>
 
