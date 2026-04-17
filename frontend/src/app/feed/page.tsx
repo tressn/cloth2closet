@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/Badge";
 import SaveDressmakerButton from "@/components/dressmakers/SaveDressmakerButton";
 import { COUNTRIES } from "@/lib/lookup/countries";
 
+export const dynamic = "force-dynamic";
+
 const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
 type FeedItem =
