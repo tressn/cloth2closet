@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { COUNTRY_SET } from "@/lib/lookup/countries";
+import { sendVerificationEmail } from "@/lib/send-verification-email";
 
 function isEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -84,6 +85,7 @@ export async function POST(req: Request) {
           email,
           username,
           passwordHash,
+          status: "PENDING_EMAIL_VERIFICATION",
           termsAcceptedAt: new Date(),
           termsAcceptedVersion: "1.0",
           role: "CUSTOMER",
@@ -104,6 +106,7 @@ export async function POST(req: Request) {
           email,
           username: username || null,
           passwordHash,
+          status: "PENDING_EMAIL_VERIFICATION",
           role: "DRESSMAKER",
           name: displayName,
           termsAcceptedAt: new Date(),
@@ -126,7 +129,13 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ ok: true });
+    try {
+      await sendVerificationEmail(email, username);
+    } catch (emailErr) {
+      console.error("Failed to send verification email:", emailErr);
+    }
+
+    return NextResponse.json({ ok: true, message: "Account created. Please check your email to verify your address.", });
   } catch {
     return NextResponse.json({ error: "Unexpected error." }, { status: 500 });
   }

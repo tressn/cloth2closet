@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "Role" AS ENUM ('CUSTOMER', 'DRESSMAKER', 'ADMIN');
 
@@ -52,6 +55,8 @@ CREATE TABLE "User" (
     "image" TEXT,
     "username" TEXT,
     "passwordHash" TEXT,
+    "termsAcceptedAt" TIMESTAMP(3),
+    "termsAcceptedVersion" TEXT,
     "role" "Role",
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -172,9 +177,9 @@ CREATE TABLE "ProjectDetails" (
     "fabricAgreed" BOOLEAN NOT NULL DEFAULT false,
     "fabricAgreedNote" TEXT,
     "requireSketch" BOOLEAN NOT NULL DEFAULT false,
-    "sketchImage" TEXT[],
     "isRush" BOOLEAN NOT NULL DEFAULT false,
     "wantsCalico" BOOLEAN NOT NULL DEFAULT false,
+    "dressmakerPrivateNotes" TEXT,
     "sketchSubmittedAt" TIMESTAMP(3),
     "sketchApprovedAt" TIMESTAMP(3),
     "measurementsRequested" TEXT[],
@@ -215,6 +220,9 @@ CREATE TABLE "ProjectMeasurementGate" (
     "requestedFields" TEXT[],
     "dressmakerConfirmedAt" TIMESTAMP(3),
     "customerConfirmedAt" TIMESTAMP(3),
+    "snapshotFieldsJson" JSONB,
+    "lockedAt" TIMESTAMP(3),
+    "sourceMeasurementId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -285,6 +293,9 @@ CREATE TABLE "Milestone" (
     "payoutEligibleAt" TIMESTAMP(3),
     "paidAt" TIMESTAMP(3),
     "releasedAt" TIMESTAMP(3),
+    "platformFeeAmount" INTEGER,
+    "shippingAmount" INTEGER,
+    "transferGroup" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -401,6 +412,7 @@ CREATE TABLE "ProjectShipping" (
     "carrierOther" TEXT,
     "trackingNumber" TEXT,
     "shippedAt" TIMESTAMP(3),
+    "quotedAmount" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -453,7 +465,8 @@ CREATE TABLE "ProjectLabel" (
 -- CreateTable
 CREATE TABLE "SupportTicket" (
     "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "userId" TEXT,
+    "requesterEmail" TEXT,
     "projectId" TEXT,
     "category" "SupportCategory" NOT NULL,
     "subject" TEXT NOT NULL,
@@ -489,6 +502,18 @@ CREATE TABLE "ShippingCarrier" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ShippingCarrier_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PasswordResetToken" (
+    "id" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -692,6 +717,12 @@ CREATE INDEX "AdminActionLog_adminId_createdAt_idx" ON "AdminActionLog"("adminId
 -- CreateIndex
 CREATE UNIQUE INDEX "ShippingCarrier_name_key" ON "ShippingCarrier"("name");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("token");
+
+-- CreateIndex
+CREATE INDEX "PasswordResetToken_userId_idx" ON "PasswordResetToken"("userId");
+
 -- AddForeignKey
 ALTER TABLE "CustomerProfile" ADD CONSTRAINT "CustomerProfile_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -832,3 +863,7 @@ ALTER TABLE "SupportTicket" ADD CONSTRAINT "SupportTicket_projectId_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "AdminActionLog" ADD CONSTRAINT "AdminActionLog_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

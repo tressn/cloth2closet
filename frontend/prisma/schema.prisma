@@ -134,6 +134,7 @@ model User {
 
   username     String? @unique
   passwordHash String?
+  passwordResetTokens PasswordResetToken[]
 
   termsAcceptedAt      DateTime?
   termsAcceptedVersion String?
@@ -832,4 +833,16 @@ model ShippingCarrier {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   projectShippings ProjectShipping[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }

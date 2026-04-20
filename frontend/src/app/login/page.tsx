@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +13,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const verified = searchParams.get("verified");
 
   async function handleCredentialsLogin() {
     setErr(null);
@@ -34,6 +37,21 @@ export default function LoginPage() {
       <Container>
         <main className="py-10">
           <div className="mx-auto max-w-lg">
+            {verified === "true" && (
+              <div className="mb-4 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-[13px] text-green-800">
+                Your email has been verified. You can now sign in.
+              </div>
+            )}
+            {verified === "expired" && (
+              <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+                That verification link has expired. Please sign in and request a new one.
+              </div>
+            )}
+            {(verified === "invalid" || verified === "error") && (
+              <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-[13px] text-red-800">
+                That verification link is invalid. Please try again or contact support.
+              </div>
+            )}
             <Card>
               <CardHeader
                 title="Welcome back"
@@ -61,6 +79,11 @@ export default function LoginPage() {
                   >
                     {loading ? "Signing in..." : "Sign in"}
                   </Button>
+                </div>
+                <div className="text-[13px] text-[var(--muted)]">
+                  <a className="underline" href="login/forgot-password">
+                    Forgot your password?
+                  </a>
                 </div>
                 <div className="text-[13px] text-[var(--muted)]">
                   New here?{" "}

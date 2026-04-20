@@ -12,7 +12,7 @@ type Role = "CUSTOMER" | "DRESSMAKER";
 type Opt = { value: string; label: string };
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const [success, setSuccess] = useState(false);
   const [role, setRole] = useState<Role>("CUSTOMER");
 
   const [email, setEmail] = useState("");
@@ -84,7 +84,39 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push("/login");
+    setSuccess(true);
+  }
+
+  if (success) {
+    return (
+      <div className="bg-[var(--bg)]">
+        <Container>
+          <main className="py-10">
+            <div className="mx-auto max-w-lg">
+              <Card>
+                <CardHeader
+                  title="Check your email"
+                  subtitle="We've sent a verification link to your inbox."
+                />
+                <CardBody className="space-y-4">
+                  <div className="text-[13px] text-[var(--muted)]">
+                    We sent a confirmation email to <strong>{email}</strong>.
+                    Click the link in that email to activate your account. Be sure
+                    to check your spam folder if you don't see it.
+                  </div>
+                  <div className="text-[13px] text-[var(--muted)]">
+                    Already verified?{" "}
+                    <a className="underline" href="/login">
+                      Sign in
+                    </a>
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
+          </main>
+        </Container>
+      </div>
+    );
   }
 
   return (
