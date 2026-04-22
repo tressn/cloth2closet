@@ -179,6 +179,21 @@ const faqSections: FAQSection[] = [
         ),
       },
       {
+        question: "Can I request a sample to check the fit before the final dress is made?",
+        answer: (
+          <>
+            Yes. If you’re concerned about fit, you can request a calico (muslin) sample in the 
+            quote form. This is a test version of the garment used to check sizing before the 
+            final piece is made.
+            <br /><br />By selecting this option, it will be added as a milestone in your project 
+            to help you track progress.
+            <br /><br />Be sure to confirm with your dressmaker that they offer this option, 
+            as not all do. You are responsible for the cost and logistics of shipping the sample 
+            to yourself and returning it to the dressmaker.
+          </>
+        ),
+      },
+      {
         question: "What happens if the designer submits a sketch?",
         answer: (
           <>
@@ -210,6 +225,17 @@ const faqSections: FAQSection[] = [
           </>
         ),
       },
+      {
+        question: "What should I do if the final item doesn’t match the sketch or what we originally agreed upon?",
+        answer: (
+          <>
+            Do not approve the final milestone. Work with your dressmaker 
+            to refine the garment until it matches what was agreed. Once you approve and 
+            complete payment, refunds may not be possible. If needed, contact support 
+            for help resolving the issue.
+          </>
+        ),
+      },
     ],
   },
   {
@@ -236,6 +262,7 @@ const faqSections: FAQSection[] = [
           </>
         ),
       },
+
       {
         question: "How do I leave a review?",
         answer: (
@@ -257,10 +284,36 @@ const faqSections: FAQSection[] = [
       },
     ],
   },
+
   {
     title: "Problems and support",
     description: "What to do when you need extra help.",
     items: [
+      {
+        question: "What should I do if the item doesn’t fit?",
+        answer: (
+          <>
+            A good fit starts with accurate measurements, so be sure your measurements are 
+            correct and clearly communicated. You can also share full-body photos (in fitted 
+            clothing) to help your dressmaker better understand your shape.
+             <br /><br /> For added accuracy, you may request a calico (muslin) sample—a test version of 
+            the garment that can be pinned, marked, and sent back to confirm sizing before the 
+            final piece is made.
+             <br /><br /> If adjustments are still needed, a local tailor can help refine the fit. 
+            You can also ask your dressmaker to include extra fabric to make alterations easier.
+          </>
+        ),
+      },
+      {
+        question: "Can I return my item?",
+        answer: (
+          <>
+            No. Each piece is custom-made, so materials and labor cannot be recovered. 
+            If the fit or finish needs improvement, we recommend working with a 
+            local tailor—especially if your dressmaker is not nearby.
+          </>
+        ),
+      },
       {
         question: "What should I do if a designer stops responding?",
         answer: (
@@ -287,6 +340,47 @@ const faqSections: FAQSection[] = [
             Include your project title or code if you have it, the designer’s
             name, a short summary of the issue, what you have already tried, and
             any screenshots or files that help explain the problem.
+          </>
+        ),
+      },
+    ],
+  },
+
+    {
+    title: "Designer FAQs",
+    description: "Designer specific questions.",
+    items: [
+      {
+        question: "How do I get paid?",
+        answer: (
+          <>
+            <ul className="list-disc pl-5">
+              <li>Set up payouts in your profile by selecting your country and preferred payment method.</li>
+              <li>Deposit payments are collected upfront before a project begins.</li>
+              <li>Confirm the full price with the customer. You can adjust the final quote to account for shipping costs if needed.</li>
+              <li>Once the item is delivered, the customer reviews and approves it.</li>
+              <li>If there are no disputes, the remaining balance is released (typically within 10 days).</li>
+            </ul>
+          </>
+        ),
+      },
+      {
+        question: "How do I set up my page?",
+        answer: (
+          <>
+            Complete your profile (add tags as needed), set up payouts, 
+            and upload portfolio images. Your portfolio helps customers 
+            understand your style and quality of work.
+          </>
+        ),
+      },
+      {
+        question: "Are there guidelines for photos?",
+        answer: (
+          <>
+            Yes. All images must be safe for work and follow our content guidelines.
+            Only upload work that is your own, misrepresenting someone else’s work as your own may result in account suspension.
+            Focus on showcasing your work clearly and professionally.
           </>
         ),
       },
