@@ -170,7 +170,7 @@ export async function POST(req: Request) {
   });
 
   // ── Stripe Checkout Session ──────────────────────────────────────
-  const appUrl = process.env.APP_URL || "http://localhost:3000";
+  const appUrl = process.env.APP_URL || "https://cloth2closet.com";
   const currency = (
     project.currency ||
     project.payment?.currency ||
