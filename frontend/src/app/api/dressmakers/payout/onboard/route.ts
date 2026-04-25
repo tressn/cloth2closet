@@ -17,7 +17,7 @@ export async function POST() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const appUrl = process.env.APP_URL || "https://cloth2closet.com/";
+  const appUrl = process.env.APP_URL || "http://localhost:3000";
 
   const dressmakerProfile = await prisma.dressmakerProfile.findUnique({
     where: { userId: session.user.id },
