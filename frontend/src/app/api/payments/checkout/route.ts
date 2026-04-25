@@ -3,15 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { MilestoneType, MilestoneStatus, ProjectStatus } from "@prisma/client";
+import { MilestoneType, MilestoneStatus } from "@prisma/client";
+import {
+  calcBuyerServiceFee,
+  calcPlatformFee,
+  isStripeTaxEnabled,
+  derivePayoutMethod,
+} from "@/lib/fees";
 
 export const runtime = "nodejs";
-
-function intEnv(name: string, fallback: number) {
-  const raw = process.env[name];
-  const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) ? Math.trunc(n) : fallback;
-}
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -23,9 +23,13 @@ export async function POST(req: Request) {
   const projectId = url.searchParams.get("projectId");
   const milestoneTypeRaw = url.searchParams.get("milestoneType");
 
-  if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });
+  if (!projectId)
+    return NextResponse.json({ error: "projectId required" }, { status: 400 });
   if (milestoneTypeRaw !== "DEPOSIT" && milestoneTypeRaw !== "FINAL") {
-    return NextResponse.json({ error: "milestoneType must be DEPOSIT or FINAL" }, { status: 400 });
+    return NextResponse.json(
+      { error: "milestoneType must be DEPOSIT or FINAL" },
+      { status: 400 }
+    );
   }
 
   const milestoneType = milestoneTypeRaw as MilestoneType;
@@ -33,9 +37,16 @@ export async function POST(req: Request) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      payment: true, // keep as rollup if you want
+      payment: true,
       milestones: true,
       details: true,
+      dressmaker: {
+        include: {
+          dressmakerProfile: {
+            select: { countryCode: true },
+          },
+        },
+      },
     },
   });
 
@@ -43,37 +54,107 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Guard: Final payment only after final approval
+  // ── Guards ───────────────────────────────────────────────────────
   if (milestoneType === "FINAL") {
     if (!project.details?.finalApprovedAt) {
-      return NextResponse.json({ error: "Final must be approved before paying final amount" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Final must be approved before paying final amount" },
+        { status: 400 }
+      );
     }
   }
 
-  // Compute deposit/final amounts.
-  // Assumptions:
-  // - project.quotedTotalAmount is total agreed price in cents
-  // - project.depositPercent is integer percentage (e.g. 30)
-  const total = project.quotedTotalAmount ?? project.payment?.totalAmount ?? null;
+  const total =
+    project.quotedTotalAmount ?? project.payment?.totalAmount ?? null;
   if (!total || total <= 0) {
-    return NextResponse.json({ error: "Missing total agreed amount (quotedTotalAmount)" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing total agreed amount (quotedTotalAmount)" },
+      { status: 400 }
+    );
   }
 
   const depositPercent = project.depositPercent ?? 0;
   if (depositPercent <= 0 || depositPercent >= 100) {
-    return NextResponse.json({ error: "depositPercent must be set on project (1..99)" }, { status: 400 });
+    return NextResponse.json(
+      { error: "depositPercent must be set on project (1..99)" },
+      { status: 400 }
+    );
   }
 
-  const depositAmount = Math.max(1, Math.trunc((total * depositPercent) / 100));
-  const finalAmount = Math.max(1, total - depositAmount);
-
-  const amount = milestoneType === "DEPOSIT" ? depositAmount : finalAmount;
-
-  // Create or fetch milestone (unique per project+type)
-  const milestone = await prisma.milestone.upsert({
+  // ── Get or calculate milestone amount ────────────────────────────
+  const existingMilestone = await prisma.milestone.findUnique({
     where: { projectId_type: { projectId: project.id, type: milestoneType } },
+  });
+
+  let milestoneAmount: number;
+
+  if (existingMilestone && existingMilestone.amount > 0) {
+    milestoneAmount = existingMilestone.amount;
+  } else {
+    const depositAmount = Math.max(
+      1,
+      Math.trunc((total * depositPercent) / 100)
+    );
+    const finalAmount = Math.max(1, total - depositAmount);
+    milestoneAmount =
+      milestoneType === "DEPOSIT" ? depositAmount : finalAmount;
+  }
+
+  // ── Fees ─────────────────────────────────────────────────────────
+  const serviceFeeAmount = calcBuyerServiceFee(milestoneAmount);
+  const platformFeeAmount = calcPlatformFee(milestoneAmount);
+
+  // ── Payout method ────────────────────────────────────────────────
+  const dressmakerCountry =
+    project.dressmaker.dressmakerProfile?.countryCode ?? null;
+  const payoutMethod = derivePayoutMethod(dressmakerCountry);
+
+  if (
+    (project as any).payoutMethod === "PENDING" ||
+    !(project as any).payoutMethod
+  ) {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        payoutMethod,
+        dressmakerCountryCode: dressmakerCountry,
+      } as any,
+    });
+  }
+
+  // ── Guards on existing milestone ─────────────────────────────────
+  if (
+    existingMilestone?.status === MilestoneStatus.PAID ||
+    existingMilestone?.status === MilestoneStatus.RELEASED
+  ) {
+    return NextResponse.json(
+      { error: "This milestone is already paid" },
+      { status: 400 }
+    );
+  }
+
+  if (
+    existingMilestone?.status === MilestoneStatus.INVOICED &&
+    existingMilestone.stripeCheckoutSessionId
+  ) {
+    await prisma.milestone.update({
+      where: { id: existingMilestone.id },
+      data: {
+        stripeCheckoutSessionId: null,
+        status: MilestoneStatus.PENDING,
+      },
+    });
+  }
+
+  // ── Milestone upsert ─────────────────────────────────────────────
+  const milestone = await prisma.milestone.upsert({
+    where: {
+      projectId_type: { projectId: project.id, type: milestoneType },
+    },
     update: {
-      amount,
+      amount: milestoneAmount,
+      serviceFeeAmount,
+      platformFeeAmount,
       title: milestoneType === "DEPOSIT" ? "Deposit" : "Final payment",
       status: MilestoneStatus.INVOICED,
     },
@@ -81,54 +162,65 @@ export async function POST(req: Request) {
       projectId: project.id,
       type: milestoneType,
       title: milestoneType === "DEPOSIT" ? "Deposit" : "Final payment",
-      amount,
+      amount: milestoneAmount,
+      serviceFeeAmount,
+      platformFeeAmount,
       status: MilestoneStatus.INVOICED,
     },
   });
 
-  // Prevent double-paying a milestone
-  if (milestone.status === MilestoneStatus.PAID || milestone.status === MilestoneStatus.RELEASED) {
-    return NextResponse.json({ error: "This milestone is already paid" }, { status: 400 });
-  }
-
-  // Prevent creating multiple checkout sessions for the same milestone
-if (milestone.status === MilestoneStatus.INVOICED && milestone.stripeCheckoutSessionId) {
-  return NextResponse.json(
-    { error: "Payment already initiated for this milestone. Please complete checkout." },
-    { status: 400 }
-  );
-}
-
+  // ── Stripe Checkout Session ──────────────────────────────────────
   const appUrl = process.env.APP_URL || "http://localhost:3000";
-  const currency = (project.currency || project.payment?.currency || "USD").toLowerCase();
+  const currency = (
+    project.currency ||
+    project.payment?.currency ||
+    "USD"
+  ).toLowerCase();
 
-  const checkout = await stripe.checkout.sessions.create({
-    mode: "payment",
-    success_url: `${appUrl}/payments/success?projectId=${project.id}&milestoneType=${milestoneType}`,
-    cancel_url: `${appUrl}/payments/cancel?projectId=${project.id}&milestoneType=${milestoneType}`,
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency,
-          unit_amount: amount,
-          product_data: {
-            name:
-              milestoneType === "DEPOSIT"
-                ? `Deposit for ${project.title ?? `Project ${project.projectCode}`}`
-                : `Final payment for ${project.title ?? `Project ${project.projectCode}`}`,
-          },
+  const projectLabel = project.title ?? `Project ${project.projectCode}`;
+
+  const lineItems: any[] = [
+    {
+      quantity: 1,
+      price_data: {
+        currency,
+        unit_amount: milestoneAmount,
+        product_data: {
+          name:
+            milestoneType === "DEPOSIT"
+              ? `Deposit for ${projectLabel}`
+              : `Final payment for ${projectLabel}`,
+          description: "Custom outfit by your dressmaker",
         },
       },
-    ],
+    },
+    {
+      quantity: 1,
+      price_data: {
+        currency,
+        unit_amount: serviceFeeAmount,
+        product_data: {
+          name: "Service fee",
+          description: "Marketplace service and payment protection",
+        },
+      },
+    },
+  ];
 
-    // VERY IMPORTANT: put identifiers on the PaymentIntent so payment_intent.* webhooks can match too
+  const checkoutParams: any = {
+    mode: "payment",
+    success_url: `${appUrl}/dashboard/customer/projects/${project.id}?payment=success&milestoneType=${milestoneType}`,
+    cancel_url: `${appUrl}/dashboard/customer/projects/${project.id}?payment=cancelled&milestoneType=${milestoneType}`,
+    line_items: lineItems,
+
     payment_intent_data: {
-      transfer_group: project.projectCode, // links transfers later :contentReference[oaicite:7]{index=7}
+      transfer_group: project.projectCode,
       metadata: {
         projectId: project.id,
         milestoneId: milestone.id,
         milestoneType,
+        serviceFeeAmount: String(serviceFeeAmount),
+        platformFeeAmount: String(platformFeeAmount),
       },
     },
 
@@ -137,8 +229,13 @@ if (milestone.status === MilestoneStatus.INVOICED && milestone.stripeCheckoutSes
       milestoneId: milestone.id,
       milestoneType,
     },
-  });
-  
+  };
+
+  if (isStripeTaxEnabled()) {
+    checkoutParams.automatic_tax = { enabled: true };
+  }
+
+  const checkout = await stripe.checkout.sessions.create(checkoutParams);
 
   await prisma.milestone.update({
     where: { id: milestone.id },
@@ -148,5 +245,5 @@ if (milestone.status === MilestoneStatus.INVOICED && milestone.stripeCheckoutSes
     },
   });
 
-  return NextResponse.redirect(checkout.url!, { status: 303 });
+  return NextResponse.json({ url: checkout.url });
 }

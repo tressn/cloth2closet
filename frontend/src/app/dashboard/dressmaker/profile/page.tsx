@@ -108,7 +108,15 @@ export default async function DressmakerProfilePage() {
               subtitle="Set up payouts so you can receive money from projects."
             />
             <CardBody className="space-y-3">
-              {profile.payoutProfile?.stripeAccountId ? (
+              {profile.payoutProfile?.provider === "PAYONEER" ? (
+                <div className="text-[14px]">
+                  <span className="font-medium">Status:</span>{" "}
+                  <span className="text-green-600">Payoneer</span>
+                  <div className="mt-1 text-[13px] text-[var(--muted)]">
+                    International payouts are processed weekly on Mondays.
+                  </div>
+                </div>
+              ) : profile.payoutProfile?.stripeAccountId ? (
                 profile.payoutProfile.payoutsEnabled ? (
                   <div className="text-[14px]">
                     <span className="font-medium">Status:</span>{" "}

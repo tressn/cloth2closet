@@ -24,13 +24,16 @@ function formatDateTime(value: Date | string | null | undefined) {
 
 export default async function CustomerProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ payment?: string; milestoneType?: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/login");
 
   const { id } = await params;
+  const { payment, milestoneType } = await searchParams;
 
   const project = await prisma.project.findUnique({
     where: { id },
@@ -64,8 +67,12 @@ export default async function CustomerProjectDetailPage({
 
   const details = project.details;
 
-  const dressmakerDisplayName = project.dressmaker.dressmakerProfile?.displayName ?? project.dressmaker.name ?? project.dressmaker.username ?? "Dressmaker";
-  
+  const dressmakerDisplayName =
+    project.dressmaker.dressmakerProfile?.displayName ??
+    project.dressmaker.name ??
+    project.dressmaker.username ??
+    "Dressmaker";
+
   const sketchImages = project.sketchSubmission?.imageUrls ?? [];
 
   const deposit = project.milestones.find((m) => m.type === "DEPOSIT");
@@ -73,26 +80,21 @@ export default async function CustomerProjectDetailPage({
 
   const depositPaid =
     deposit?.status === "PAID" || deposit?.status === "RELEASED";
-  const finalPaid =
-    final?.status === "PAID" || final?.status === "RELEASED";
+  const finalPaid = final?.status === "PAID" || final?.status === "RELEASED";
 
   const showPayDeposit = project.status === "ACCEPTED" && !depositPaid;
-  const finalSubmitted = !!details?.finalSubmittedAt;
-  const showPayFinal = (!!details?.finalApprovedAt || project.status === "READY_TO_SHIP") && !finalPaid;
+  const showPayFinal =
+    (!!details?.finalApprovedAt || project.status === "READY_TO_SHIP") &&
+    final?.status === "INVOICED" &&
+    !finalPaid;
 
   const canReview =
-    project.status === "COMPLETED" &&
-    finalPaid &&
-    !project.review;
+    project.status === "COMPLETED" && finalPaid && !project.review;
 
-  // Temporary shim for ProjectProgress until its prop type is updated
   const projectForProgress = {
     ...project,
     details: details
-      ? {
-          ...details,
-          sketchImage: sketchImages,
-        }
+      ? { ...details, sketchImage: sketchImages }
       : null,
   };
 
@@ -105,6 +107,18 @@ export default async function CustomerProjectDetailPage({
       ]}
     >
       <div className="max-w-4xl space-y-6">
+        {/* ── Payment success/cancel banner ─────────────────────── */}
+        {payment === "success" ? (
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-[14px] text-green-800">
+            Payment confirmed! Your{" "}
+            {milestoneType?.toLowerCase() ?? "payment"} has been processed.
+          </div>
+        ) : payment === "cancelled" ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-[14px] text-amber-800">
+            Payment was cancelled. You can try again when ready.
+          </div>
+        ) : null}
+
         <Card>
           <CardHeader
             title="Overview"
@@ -129,12 +143,16 @@ export default async function CustomerProjectDetailPage({
               Quote:{" "}
               <span className="font-semibold text-[var(--text)]">
                 {project.quotedTotalAmount != null
-                  ? formatMoney(project.quotedTotalAmount, project.currency)
+                  ? formatMoney(
+                      project.quotedTotalAmount,
+                      project.currency
+                    )
                   : "Not quoted yet"}
               </span>
             </div>
 
             <div className="grid gap-2">
+              {/* ── Deposit: show total the buyer pays (amount + service fee) ── */}
               <div>
                 Deposit:{" "}
                 <span className="font-semibold text-[var(--text)]">
@@ -142,11 +160,17 @@ export default async function CustomerProjectDetailPage({
                 </span>
                 {deposit?.amount != null ? (
                   <span className="ml-2 text-[13px] text-[var(--muted)]">
-                    ({formatMoney(deposit.amount, project.currency)})
+                    (
+                    {formatMoney(
+                      deposit.amount,
+                      project.currency
+                    )}
+                    )
                   </span>
                 ) : null}
               </div>
 
+              {/* ── Final: show total the buyer pays ── */}
               <div>
                 Final:{" "}
                 <span className="font-semibold text-[var(--text)]">
@@ -154,7 +178,12 @@ export default async function CustomerProjectDetailPage({
                 </span>
                 {final?.amount != null ? (
                   <span className="ml-2 text-[13px] text-[var(--muted)]">
-                    ({formatMoney(final.amount, project.currency)})
+                    (
+                    {formatMoney(
+                      final.amount,
+                      project.currency
+                    )}
+                    )
                   </span>
                 ) : null}
               </div>
@@ -176,9 +205,15 @@ export default async function CustomerProjectDetailPage({
               ) : null}
 
               {!showPayDeposit && !showPayFinal ? (
-                <div className="text-[13px] text-[var(--muted)]">
-                  No payments due right now.
-                </div>
+                final && final.status === "PENDING" && project.status === "READY_TO_SHIP" ? (
+                  <div className="text-[13px] text-[var(--muted)]">
+                    Your dressmaker is preparing the final invoice. You'll be able to pay once it's sent.
+                  </div>
+                ) : (
+                  <div className="text-[13px] text-[var(--muted)]">
+                    No payments due right now.
+                  </div>
+                )
               ) : null}
             </div>
 
@@ -194,7 +229,9 @@ export default async function CustomerProjectDetailPage({
                   </Link>
                 </div>
               ) : canReview ? (
-                <Link href={`/dashboard/customer/projects/${project.id}/review`}>
+                <Link
+                  href={`/dashboard/customer/projects/${project.id}/review`}
+                >
                   <Button variant="primary">Leave a verified review</Button>
                 </Link>
               ) : (
@@ -207,7 +244,6 @@ export default async function CustomerProjectDetailPage({
           </CardBody>
         </Card>
 
-        {/* ✅ Your request summary — mirrors what the dressmaker sees */}
         <Card>
           <CardHeader
             title="Your request"
@@ -232,7 +268,10 @@ export default async function CustomerProjectDetailPage({
                   label: "Budget ceiling",
                   value:
                     details?.budgetCeiling != null
-                      ? formatMoney(details.budgetCeiling, project.currency)
+                      ? formatMoney(
+                          details.budgetCeiling,
+                          project.currency
+                        )
                       : "—",
                 },
                 {
@@ -243,9 +282,18 @@ export default async function CustomerProjectDetailPage({
                   label: "Size notes",
                   value: details?.sizeNotes?.trim() || "—",
                 },
-                { label: "Rush order", value: details?.isRush ? "Yes" : "No" },
-                { label: "Calico mockup", value: details?.wantsCalico ? "Yes" : "No" },
-                { label: "Sketch required", value: details?.requireSketch ? "Yes" : "No" },
+                {
+                  label: "Rush order",
+                  value: details?.isRush ? "Yes" : "No",
+                },
+                {
+                  label: "Calico mockup",
+                  value: details?.wantsCalico ? "Yes" : "No",
+                },
+                {
+                  label: "Sketch required",
+                  value: details?.requireSketch ? "Yes" : "No",
+                },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -278,22 +326,24 @@ export default async function CustomerProjectDetailPage({
                   Reference images you sent
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {details.referenceImages.slice(0, 6).map((url: string, idx: number) => (
-                    <a
-                      key={`${url}-${idx}`}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt={`Reference ${idx + 1}`}
-                        className="h-40 w-full object-cover"
-                      />
-                    </a>
-                  ))}
+                  {details.referenceImages
+                    .slice(0, 6)
+                    .map((url: string, idx: number) => (
+                      <a
+                        key={`${url}-${idx}`}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt={`Reference ${idx + 1}`}
+                          className="h-40 w-full object-cover"
+                        />
+                      </a>
+                    ))}
                 </div>
               </div>
             ) : null}
@@ -301,7 +351,10 @@ export default async function CustomerProjectDetailPage({
         </Card>
 
         <Card>
-          <CardHeader title="Details" subtitle="Key info for quoting + fit." />
+          <CardHeader
+            title="Details"
+            subtitle="Key info for quoting + fit."
+          />
           <CardBody className="space-y-3 text-[14px] text-[var(--muted)]">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -330,7 +383,9 @@ export default async function CustomerProjectDetailPage({
             </div>
 
             <div className="border-t border-[var(--border)] pt-3">
-              <div className="font-semibold text-[var(--text)]">Key dates</div>
+              <div className="font-semibold text-[var(--text)]">
+                Key dates
+              </div>
               <div className="text-[13px]">
                 Final garment submitted:{" "}
                 <span className="font-semibold text-[var(--text)]">
@@ -341,7 +396,9 @@ export default async function CustomerProjectDetailPage({
 
             {details?.requireSketch ? (
               <div className="border-t border-[var(--border)] pt-3">
-                <div className="font-semibold text-[var(--text)]">Sketch</div>
+                <div className="font-semibold text-[var(--text)]">
+                  Sketch
+                </div>
 
                 {sketchImages.length > 0 ? (
                   <div className="mt-3 space-y-3">
@@ -391,28 +448,35 @@ export default async function CustomerProjectDetailPage({
 
             {details?.finalImages?.length ? (
               <div className="border-t border-[var(--border)] pt-3">
-                <div className="font-semibold text-[var(--text)]">Final garment photos</div>
+                <div className="font-semibold text-[var(--text)]">
+                  Final garment photos
+                </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  {details.finalImages.map((url: string, idx: number) => (
-                    <a
-                      key={`${url}-${idx}`}
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={url}
-                        alt={`Final photo ${idx + 1}`}
-                        className="w-full object-cover"
-                      />
-                  </a>
-                ))}
+                  {details.finalImages.map(
+                    (url: string, idx: number) => (
+                      <a
+                        key={`${url}-${idx}`}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt={`Final photo ${idx + 1}`}
+                          className="w-full object-cover"
+                        />
+                      </a>
+                    )
+                  )}
                 </div>
                 {details.finalApprovedAt ? (
                   <div className="mt-2 text-[12px] text-green-600 font-medium">
-                    ✓ Approved {new Date(details.finalApprovedAt).toLocaleDateString()}
+                    ✓ Approved{" "}
+                    {new Date(
+                      details.finalApprovedAt
+                    ).toLocaleDateString()}
                   </div>
                 ) : (
                   <div className="mt-2 text-[12px] text-[var(--muted)]">
@@ -424,7 +488,9 @@ export default async function CustomerProjectDetailPage({
 
             {project.projectShipping ? (
               <div className="border-t border-[var(--border)] pt-3">
-                <div className="font-semibold text-[var(--text)]">Shipping</div>
+                <div className="font-semibold text-[var(--text)]">
+                  Shipping
+                </div>
                 <div className="text-[13px]">
                   Carrier:{" "}
                   <span className="font-semibold text-[var(--text)]">
@@ -433,14 +499,12 @@ export default async function CustomerProjectDetailPage({
                       "—"}
                   </span>
                 </div>
-
                 <div className="text-[13px]">
                   Tracking number:{" "}
                   <span className="font-semibold text-[var(--text)]">
                     {project.projectShipping.trackingNumber ?? "—"}
                   </span>
                 </div>
-
                 <div className="text-[13px]">
                   Shipped at:{" "}
                   <span className="font-semibold text-[var(--text)]">

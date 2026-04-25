@@ -11,6 +11,8 @@ import ProjectDetailsEditor from "@/app/features/ProjectDetailsEditor";
 import ProjectProgress from "@/components/projects/ProjectProgress";
 import { formatMoney } from "@/lib/money";
 import DressmakerNotesCard from "./DressmakerNotesCard";
+import DeadlineAlerts from "@/components/projects/DeadlineAlerts";
+import SendFinalInvoiceButton from "./SendFinalInvoiceButton";
 
 function formatDateTime(value: Date | string | null | undefined) {
   if (!value) return "—";
@@ -138,6 +140,13 @@ const measurementFields = measurementsLocked
       tabs={[{ label: "Back to projects", href: "/dashboard/dressmaker/projects" }]}
     >
       <div className="max-w-5xl space-y-6">
+        <DeadlineAlerts
+          deadlines={[
+            { label: "Ship-by date", date: details?.shipByDate },
+            { label: "Event date", date: details?.eventDate },
+          ]}
+        />
+
         <Card>
           <CardHeader
             title="Overview"
@@ -195,6 +204,32 @@ const measurementFields = measurementsLocked
                       <span className={finalPaid ? "text-green-600 font-semibold" : ""}>
                         {finalPaid ? "— Paid ✓" : `— ${final.status}`}
                       </span>
+                    </div>
+                  ) : null}
+                  {deposit && (deposit.status === "PAID" || deposit.status === "RELEASED") ? (
+                    <div>
+                      Your deposit earnings:{" "}
+                      <span className="font-semibold text-green-600">
+                        {formatMoney(
+                          deposit.amount - (deposit.platformFeeAmount ?? Math.trunc(deposit.amount * 0.1)),
+                          project.currency
+                        )}
+                      </span>
+                      <span className="ml-1 text-[12px] text-[var(--muted)]">
+                        (after {deposit.platformFeeAmount ? formatMoney(deposit.platformFeeAmount, project.currency) : "10%"} our commission)
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {final &&
+                    final.status === "PENDING" &&
+                    (project.status === "READY_TO_SHIP" || project.status === "IN_PROGRESS") ? (
+                        <div className="sm:col-span-2 pt-2">
+                          <SendFinalInvoiceButton projectId={project.id} />
+                        </div>
+                      ) : final?.status === "INVOICED" && !finalPaid ? (
+                    <div className="sm:col-span-2 text-[13px] text-green-600 font-medium">
+                      ✓ Final invoice sent — waiting for customer payment
                     </div>
                   ) : null}
 
@@ -450,7 +485,7 @@ const measurementFields = measurementsLocked
                 subtitle={
                   depositAlreadyPaid
                     ? `Deposit of ${formatMoney(depositPaidAmount!, project.currency)} already paid. Update the total to adjust the remaining balance.`
-                    : "Enter the full customer-facing amount including all costs."
+                    : "Enter your price for this project including materials and shipping."
                 }
               />
               <CardBody>

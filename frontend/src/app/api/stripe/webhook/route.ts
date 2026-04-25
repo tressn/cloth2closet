@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { MilestoneStatus, ProjectStatus, TransferStatus } from "@prisma/client";
+import { calcPlatformFee, derivePayoutMethod } from "@/lib/fees";
 
 export const runtime = "nodejs";
 
@@ -12,23 +13,42 @@ function intEnv(name: string, fallback: number) {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-function calcPlatformFee(amount: number) {
-  const bps = intEnv("PLATFORM_FEE_BPS", 1000); // default 10%
-  return Math.max(0, Math.trunc((amount * bps) / 10000));
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+async function notifyUser(opts: {
+  userId: string;
+  title: string;
+  body?: string | null;
+  href?: string | null;
+  projectId?: string | null;
+}) {
+  await prisma.notification.create({
+    data: {
+      userId: opts.userId,
+      type: "PAYMENT_SUCCEEDED",
+      title: opts.title,
+      body: opts.body ?? null,
+      href: opts.href ?? null,
+      projectId: opts.projectId ?? null,
+    },
+  });
 }
 
-async function notifyAdmins(opts: { title: string; body?: string | null; href?: string | null; projectId?: string | null }) {
+async function notifyAdmins(opts: {
+  title: string;
+  body?: string | null;
+  href?: string | null;
+  projectId?: string | null;
+}) {
   const admins = await prisma.user.findMany({
     where: { role: "ADMIN" },
     select: { id: true },
   });
-
   if (admins.length === 0) return;
-
   await prisma.notification.createMany({
     data: admins.map((a) => ({
       userId: a.id,
-      type: "PAYMENT_SUCCEEDED", // reuse existing enum; see note below
+      type: "PAYMENT_SUCCEEDED" as const,
       title: opts.title,
       body: opts.body ?? null,
       href: opts.href ?? null,
@@ -37,7 +57,12 @@ async function notifyAdmins(opts: { title: string; body?: string | null; href?: 
   });
 }
 
-async function createStripeTransferOrThrow(opts: {
+/**
+ * Attempts a Stripe Connect transfer for US dressmakers.
+ * For international dressmakers (Payoneer), this is skipped —
+ * payouts happen via your weekly Payoneer batch.
+ */
+async function attemptStripeTransfer(opts: {
   milestoneId: string;
   projectId: string;
   projectCode: string;
@@ -47,44 +72,58 @@ async function createStripeTransferOrThrow(opts: {
 }) {
   const { milestoneId, projectId, projectCode, currency, amount, dressmakerUserId } = opts;
 
-  // ✅ Idempotency guard: if transfer already exists for this milestone, do nothing
+  // Idempotency: already transferred?
   const existing = await prisma.transfer.findUnique({
     where: { milestoneId },
-    select: { id: true, stripeTransferId: true, status: true },
+    select: { stripeTransferId: true },
   });
+  if (existing?.stripeTransferId) return { skipped: true };
 
-  if (existing?.stripeTransferId) {
-    // already created a transfer in Stripe
-    return { transferId: existing.stripeTransferId, fee: 0, transferAmount: 0, skipped: true as const };
-  }
-
+  // Check dressmaker's payout setup
   const dressmaker = await prisma.user.findUnique({
     where: { id: dressmakerUserId },
-    include: { dressmakerProfile: { include: { payoutProfile: true } } },
+    include: {
+      dressmakerProfile: {
+        include: { payoutProfile: true },
+      },
+    },
   });
 
-  const stripeAccountId = dressmaker?.dressmakerProfile?.payoutProfile?.stripeAccountId;
-  const payoutsEnabled = dressmaker?.dressmakerProfile?.payoutProfile?.payoutsEnabled;
+  const countryCode = dressmaker?.dressmakerProfile?.countryCode;
+  const payoutMethod = derivePayoutMethod(countryCode);
+
+  // ── INTERNATIONAL: skip Stripe transfer, queue for Payoneer ──────
+  if (payoutMethod === "PAYONEER" || payoutMethod === "PENDING") {
+    // Just mark milestone as PAID (not RELEASED) — you'll release
+    // via Payoneer batch later. The dressmaker sees "Payout pending"
+    // in their dashboard.
+    return { skipped: true, reason: "payoneer" };
+  }
+
+  // ── US: Stripe Connect transfer ──────────────────────────────────
+  const stripeAccountId =
+    dressmaker?.dressmakerProfile?.payoutProfile?.stripeAccountId;
+  const payoutsEnabled =
+    dressmaker?.dressmakerProfile?.payoutProfile?.payoutsEnabled;
 
   if (!stripeAccountId) throw new Error("Dressmaker missing Stripe payout setup");
-  if (!payoutsEnabled) throw new Error("Dressmaker Stripe payouts not enabled (KYC incomplete)");
+  if (!payoutsEnabled) throw new Error("Dressmaker Stripe payouts not enabled");
 
   const fee = calcPlatformFee(amount);
   const transferAmount = amount - fee;
   if (transferAmount <= 0) throw new Error("Transfer amount <= 0 after fees");
 
-  // ✅ Create transfer on Stripe
-  const tr = await stripe.transfers.create({
-    amount: transferAmount,
-    currency: currency.toLowerCase(),
-    destination: stripeAccountId,
-    transfer_group: projectCode,
-    metadata: { projectId, milestoneId, fee: String(fee) },
-  }, 
-  { idempotencyKey: `milestone:${milestoneId}:transfer` }
+  const tr = await stripe.transfers.create(
+    {
+      amount: transferAmount,
+      currency: currency.toLowerCase(),
+      destination: stripeAccountId,
+      transfer_group: projectCode,
+      metadata: { projectId, milestoneId, fee: String(fee) },
+    },
+    { idempotencyKey: `milestone:${milestoneId}:transfer` }
   );
 
-  // ✅ Write DB in a transaction
   await prisma.$transaction([
     prisma.transfer.upsert({
       where: { milestoneId },
@@ -97,28 +136,41 @@ async function createStripeTransferOrThrow(opts: {
     }),
   ]);
 
-  return { transferId: tr.id, fee, transferAmount, skipped: false as const };
+  return { skipped: false, transferId: tr.id, fee, transferAmount };
 }
 
+// ─── Webhook handler ──────────────────────────────────────────────────
 
 export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
-  if (!sig) return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
+  if (!sig)
+    return NextResponse.json(
+      { error: "Missing stripe-signature header" },
+      { status: 400 }
+    );
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) return NextResponse.json({ error: "Missing STRIPE_WEBHOOK_SECRET" }, { status: 500 });
+  if (!webhookSecret)
+    return NextResponse.json(
+      { error: "Missing STRIPE_WEBHOOK_SECRET" },
+      { status: 500 }
+    );
 
   let event: Stripe.Event;
-  const rawBody = await req.text(); // Stripe requires raw body :contentReference[oaicite:11]{index=11}
+  const rawBody = await req.text();
 
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
   } catch (err: any) {
-    return NextResponse.json({ error: `Webhook signature verification failed: ${err.message}` }, { status: 400 });
+    return NextResponse.json(
+      { error: `Webhook signature verification failed: ${err.message}` },
+      { status: 400 }
+    );
   }
 
   try {
     switch (event.type) {
+      // ── Connect account updates ──────────────────────────────────
       case "account.updated": {
         const acct = event.data.object as Stripe.Account;
 
@@ -127,17 +179,22 @@ export async function POST(req: Request) {
           data: {
             payoutsEnabled: acct.payouts_enabled ?? false,
             detailsSubmitted: acct.details_submitted ?? false,
-            requirementsJson: acct.requirements ? (acct.requirements as any) : undefined,
+            requirementsJson: acct.requirements
+              ? (acct.requirements as any)
+              : undefined,
           },
         });
-
         break;
       }
 
+      // ── Checkout completed (deposit or final paid) ───────────────
       case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const stripeSessionId = session.id;
-        const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : null;
+        const checkoutSession = event.data.object as Stripe.Checkout.Session;
+        const stripeSessionId = checkoutSession.id;
+        const paymentIntentId =
+          typeof checkoutSession.payment_intent === "string"
+            ? checkoutSession.payment_intent
+            : null;
 
         const milestone = await prisma.milestone.findFirst({
           where: { stripeCheckoutSessionId: stripeSessionId },
@@ -145,40 +202,60 @@ export async function POST(req: Request) {
         });
         if (!milestone) break;
 
+        // Idempotency: already processed
+        if (
+          milestone.status === MilestoneStatus.PAID ||
+          milestone.status === MilestoneStatus.RELEASED
+        ) {
+          break;
+        }
+
         const now = new Date();
         const finalDelayDays = intEnv("FINAL_PAYOUT_DELAY_DAYS", 7);
         const payoutEligibleAt =
           milestone.type === "DEPOSIT"
             ? now
-            : new Date(now.getTime() + finalDelayDays * 24 * 60 * 60 * 1000);
+            : new Date(
+                now.getTime() + finalDelayDays * 24 * 60 * 60 * 1000
+              );
 
-        // Mark milestone PAID
-        // ✅ Idempotency guard: if already PAID/RELEASED, don't redo work
-        if (milestone.status === MilestoneStatus.PAID || milestone.status === MilestoneStatus.RELEASED) {
-          break;
+        // ── Extract tax from Stripe (if tax was enabled) ───────────
+        let taxAmount = 0;
+        if (checkoutSession.total_details?.amount_tax) {
+          taxAmount = checkoutSession.total_details.amount_tax;
         }
 
-        // Mark milestone PAID
+        // ── Mark milestone PAID ────────────────────────────────────
         await prisma.milestone.update({
           where: { id: milestone.id },
           data: {
             status: MilestoneStatus.PAID,
-            stripePaymentIntentId: paymentIntentId ?? milestone.stripePaymentIntentId,
+            stripePaymentIntentId:
+              paymentIntentId ?? milestone.stripePaymentIntentId,
             paidAt: now,
             payoutEligibleAt,
+            taxAmount: taxAmount || undefined,
           },
         });
 
-        // Deposit: move project IN_PROGRESS and pay out immediately
+        // ── Notify customer ────────────────────────────────────────
+        await notifyUser({
+          userId: milestone.project.customerId,
+          title: `Payment confirmed`,
+          body: `Your ${milestone.type.toLowerCase()} for ${milestone.project.projectCode} has been received.`,
+          href: `/dashboard/customer/projects/${milestone.projectId}`,
+          projectId: milestone.projectId,
+        });
+
+        // ── Deposit: advance project + attempt immediate transfer ──
         if (milestone.type === "DEPOSIT") {
           await prisma.project.update({
             where: { id: milestone.projectId },
             data: { status: ProjectStatus.IN_PROGRESS },
           });
 
-          // Create transfer now (immediate deposit payout)
           try {
-            await createStripeTransferOrThrow({
+            const result = await attemptStripeTransfer({
               milestoneId: milestone.id,
               projectId: milestone.project.id,
               projectCode: milestone.project.projectCode,
@@ -186,70 +263,94 @@ export async function POST(req: Request) {
               amount: milestone.amount,
               dressmakerUserId: milestone.project.dressmakerId,
             });
-          } catch (e: any) {
-            // Don’t fail webhook if payout fails; log + notify dressmaker/admin
-            // Stripe will retry the whole webhook otherwise; safer to capture state and let your release job retry.
-            await prisma.notification.create({
-              data: {
+
+            if (result.skipped && (result as any).reason === "payoneer") {
+              // International dressmaker — notify them payout is pending
+              await notifyUser({
                 userId: milestone.project.dressmakerId,
-                type: "PAYMENT_SUCCEEDED",
-                title: "Deposit received (payout pending)",
-                body: e?.message ?? "Payout setup required",
-                href: `/dashboard/dressmaker/profile`,
-                projectId: milestone.project.id,
-              },
+                title: "Deposit received — payout processing",
+                body: "Your deposit payment has been received. Payout will be processed in the next weekly batch.",
+                href: `/dashboard/dressmaker/earnings`,
+                projectId: milestone.projectId,
+              });
+            } else {
+              // US dressmaker — transferred via Stripe
+              await notifyUser({
+                userId: milestone.project.dressmakerId,
+                title: "Deposit received and paid out",
+                body: `Deposit for ${milestone.project.projectCode} has been transferred to your bank.`,
+                href: `/dashboard/dressmaker/earnings`,
+                projectId: milestone.projectId,
+              });
+            }
+          } catch (e: any) {
+            // Don't fail the webhook — notify and let release job retry
+            await notifyUser({
+              userId: milestone.project.dressmakerId,
+              title: "Deposit received (payout pending)",
+              body: e?.message ?? "Payout setup required",
+              href: `/dashboard/dressmaker/profile`,
+              projectId: milestone.projectId,
             });
           }
         }
 
-        // Final: do NOT transfer here (wait for payoutEligibleAt + release job)
+        // ── Final: do NOT transfer yet (wait for payoutEligibleAt) ─
+        if (milestone.type === "FINAL") {
+          await notifyUser({
+            userId: milestone.project.dressmakerId,
+            title: "Final payment received",
+            body: `Final payment for ${milestone.project.projectCode} received. Payout will be released after the review period.`,
+            href: `/dashboard/dressmaker/earnings`,
+            projectId: milestone.projectId,
+          });
+        }
+
         break;
       }
 
+      // ── Checkout expired ─────────────────────────────────────────
       case "checkout.session.expired": {
-        const session = event.data.object as Stripe.Checkout.Session;
+        const expiredSession = event.data.object as Stripe.Checkout.Session;
 
         await prisma.milestone.updateMany({
-          where: { stripeCheckoutSessionId: session.id, status: MilestoneStatus.INVOICED},
+          where: {
+            stripeCheckoutSessionId: expiredSession.id,
+            status: MilestoneStatus.INVOICED,
+          },
           data: { status: MilestoneStatus.CANCELED },
         });
-
         break;
       }
 
+      // ── Refund ───────────────────────────────────────────────────
       case "charge.refunded": {
         const charge = event.data.object as Stripe.Charge;
-
-        const paymentIntentId =
-          typeof charge.payment_intent === "string" ? charge.payment_intent : null;
-
-        if (!paymentIntentId) break;
+        const piId =
+          typeof charge.payment_intent === "string"
+            ? charge.payment_intent
+            : null;
+        if (!piId) break;
 
         const milestone = await prisma.milestone.findFirst({
-          where: { stripePaymentIntentId: paymentIntentId },
+          where: { stripePaymentIntentId: piId },
           include: { project: true },
         });
-
         if (!milestone) break;
 
-        // Mark milestone canceled/refunded in your DB
         await prisma.milestone.update({
           where: { id: milestone.id },
-          data: {
-            status: MilestoneStatus.REFUNDED,
-            // You can also store refundedAt if you add a field later
-          },
+          data: { status: MilestoneStatus.REFUNDED },
         });
 
         const title = "Payment refunded";
         const body = `A payment for ${milestone.type} was refunded for project ${milestone.project.projectCode}.`;
 
-        // Notify customer + dressmaker
         await prisma.notification.createMany({
           data: [
             {
               userId: milestone.project.customerId,
-              type: "PAYMENT_SUCCEEDED",
+              type: "PAYMENT_REFUNDED",
               title,
               body,
               href: `/dashboard/customer/projects/${milestone.projectId}`,
@@ -257,7 +358,7 @@ export async function POST(req: Request) {
             },
             {
               userId: milestone.project.dressmakerId,
-              type: "PAYMENT_SUCCEEDED",
+              type: "PAYMENT_REFUNDED",
               title,
               body,
               href: `/dashboard/dressmaker/projects/${milestone.projectId}`,
@@ -266,47 +367,43 @@ export async function POST(req: Request) {
           ],
         });
 
-        // Notify admins
         await notifyAdmins({
           title,
           body: `${body} Charge: ${charge.id}`,
           href: `/dashboard/dressmaker/projects/${milestone.projectId}`,
           projectId: milestone.projectId,
         });
-
         break;
       }
 
+      // ── Dispute ──────────────────────────────────────────────────
       case "charge.dispute.created": {
         const dispute = event.data.object as Stripe.Dispute;
-
-        const chargeId = typeof dispute.charge === "string" ? dispute.charge : null;
+        const chargeId =
+          typeof dispute.charge === "string" ? dispute.charge : null;
         if (!chargeId) break;
 
-        // Retrieve charge so we can find payment_intent -> milestone
-        const charge = await stripe.charges.retrieve(chargeId);
-
-        const paymentIntentId =
-          typeof charge.payment_intent === "string" ? charge.payment_intent : null;
-
-        if (!paymentIntentId) break;
+        const fullCharge = await stripe.charges.retrieve(chargeId);
+        const piId =
+          typeof fullCharge.payment_intent === "string"
+            ? fullCharge.payment_intent
+            : null;
+        if (!piId) break;
 
         const milestone = await prisma.milestone.findFirst({
-          where: { stripePaymentIntentId: paymentIntentId },
+          where: { stripePaymentIntentId: piId },
           include: { project: true },
         });
-
         if (!milestone) break;
 
         const title = "Dispute opened";
         const body = `A dispute was opened for ${milestone.type} on project ${milestone.project.projectCode}.`;
 
-        // Notify customer + dressmaker
         await prisma.notification.createMany({
           data: [
             {
               userId: milestone.project.customerId,
-              type: "PAYMENT_SUCCEEDED",
+              type: "DISPUTE_OPENED",
               title,
               body,
               href: `/dashboard/customer/projects/${milestone.projectId}`,
@@ -314,7 +411,7 @@ export async function POST(req: Request) {
             },
             {
               userId: milestone.project.dressmakerId,
-              type: "PAYMENT_SUCCEEDED",
+              type: "DISPUTE_OPENED",
               title,
               body,
               href: `/dashboard/dressmaker/projects/${milestone.projectId}`,
@@ -323,14 +420,12 @@ export async function POST(req: Request) {
           ],
         });
 
-        // Notify admins (include dispute id + reason/status)
         await notifyAdmins({
           title,
-          body: `${body} Dispute: ${dispute.id} Status: ${dispute.status} Reason: ${dispute.reason ?? "n/a"}`,
+          body: `${body} Dispute: ${dispute.id} Reason: ${dispute.reason ?? "n/a"}`,
           href: `/dashboard/dressmaker/projects/${milestone.projectId}`,
           projectId: milestone.projectId,
         });
-
         break;
       }
 
@@ -338,7 +433,11 @@ export async function POST(req: Request) {
         break;
     }
   } catch (err: any) {
-    return NextResponse.json({ error: `Webhook handler failed: ${err.message}` }, { status: 500 });
+    console.error("[stripe-webhook]", err);
+    return NextResponse.json(
+      { error: `Webhook handler failed: ${err.message}` },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });

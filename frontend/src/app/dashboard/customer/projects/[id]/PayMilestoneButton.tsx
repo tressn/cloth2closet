@@ -9,30 +9,35 @@ type Props = {
   disabled?: boolean;
 };
 
-export default function PayMilestoneButton({ projectId, milestoneType, disabled }: Props) {
+export default function PayMilestoneButton({
+  projectId,
+  milestoneType,
+  disabled,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onClick() {
     setLoading(true);
     setError(null);
+
     try {
       const res = await fetch(
         `/api/payments/checkout?projectId=${encodeURIComponent(projectId)}&milestoneType=${milestoneType}`,
         { method: "POST" }
       );
 
-      // This endpoint redirects (303). fetch doesn't navigate cross-origin automatically.
-      const redirectUrl = res.url;
+      const data = await res.json();
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data?.error ?? `Checkout failed (HTTP ${res.status})`);
       }
 
-      if (!redirectUrl) throw new Error("Missing redirect URL.");
+      if (!data.url) {
+        throw new Error("Missing checkout URL.");
+      }
 
-      window.location.href = redirectUrl;
+      window.location.href = data.url;
     } catch (e: any) {
       setError(e?.message ?? "Something went wrong.");
       setLoading(false);
@@ -47,12 +52,17 @@ export default function PayMilestoneButton({ projectId, milestoneType, disabled 
       <Button onClick={onClick} disabled={disabled || loading}>
         {loading ? "Opening Stripe Checkout..." : label}
       </Button>
-      {error ? <div className="text-[13px] text-red-600">{error}</div> : null}
+      {error ? (
+        <div className="text-[13px] text-red-600">{error}</div>
+      ) : null}
       <p className="text-[12px] text-[var(--muted)]">
-        By paying you confirm the deposit is non-refundable and agree to our{" "}
-        <a href="/terms" className="underline">Terms of Service</a>.
+        By paying you confirm the deposit is non-refundable and agree to
+        our{" "}
+        <a href="/terms" className="underline">
+          Terms of Service
+        </a>
+        .
       </p>
-      <p></p>
     </div>
   );
 }

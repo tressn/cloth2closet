@@ -17,6 +17,9 @@ CREATE TYPE "MilestoneStatus" AS ENUM ('PENDING', 'INVOICED', 'PAID', 'RELEASED'
 CREATE TYPE "TransferStatus" AS ENUM ('PENDING', 'PAID_OUT', 'FAILED', 'REVERSED');
 
 -- CreateEnum
+CREATE TYPE "PayoutMethod" AS ENUM ('STRIPE', 'PAYONEER', 'PENDING');
+
+-- CreateEnum
 CREATE TYPE "AttireType" AS ENUM ('DRESS', 'SUIT', 'TOP', 'SKIRT', 'PANTS', 'OUTERWEAR', 'TRADITIONAL', 'OTHER', 'BRIDAL', 'EVENINGWEAR');
 
 -- CreateEnum
@@ -157,6 +160,8 @@ CREATE TABLE "Project" (
     "status" "ProjectStatus" NOT NULL DEFAULT 'REQUESTED',
     "customerId" TEXT NOT NULL,
     "dressmakerId" TEXT NOT NULL,
+    "payoutMethod" "PayoutMethod" NOT NULL DEFAULT 'PENDING',
+    "dressmakerCountryCode" TEXT,
     "quotedTotalAmount" INTEGER,
     "currency" TEXT NOT NULL DEFAULT 'USD',
     "depositPercent" INTEGER,
@@ -296,6 +301,8 @@ CREATE TABLE "Milestone" (
     "platformFeeAmount" INTEGER,
     "shippingAmount" INTEGER,
     "transferGroup" TEXT,
+    "serviceFeeAmount" INTEGER,
+    "taxAmount" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

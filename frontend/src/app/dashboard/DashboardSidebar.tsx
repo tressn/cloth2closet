@@ -149,6 +149,10 @@ export default async function DashboardSidebar() {
                       href="/dashboard/dressmaker/quotes"
                       label="Quotes"
                     />
+                    <NavLink
+                      href="/dashboard/dressmaker/earnings"
+                      label="Earnings"
+                    />
                   </div>
                 </>
               ) : (

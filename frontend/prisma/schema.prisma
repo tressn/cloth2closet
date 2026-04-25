@@ -57,6 +57,12 @@ enum TransferStatus {
   REVERSED
 }
 
+enum PayoutMethod {
+  STRIPE
+  PAYONEER
+  PENDING
+}
+
 enum AttireType {
   DRESS
   SUIT
@@ -319,6 +325,8 @@ model Project {
 
   details    ProjectDetails?
   payment    Payment?
+  payoutMethod    PayoutMethod @default(PENDING)
+  dressmakerCountryCode String?
   milestones Milestone[]
   review     Review?
 
@@ -538,6 +546,8 @@ model Milestone {
   platformFeeAmount Int?   // your fee for this milestone
   shippingAmount    Int?   // only used when shipping is included in this milestone
   transferGroup     String? // Stripe reconciliation key
+  serviceFeeAmount  Int?    // buyer service fee for this milestone
+  taxAmount         Int?    // tax collected (Stripe Tax)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
