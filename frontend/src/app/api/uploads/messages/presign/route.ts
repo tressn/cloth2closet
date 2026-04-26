@@ -14,6 +14,9 @@ const s3 = new S3Client({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
   },
+
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 })
 
 export async function POST(req: Request) {
@@ -55,7 +58,7 @@ export async function POST(req: Request) {
     ContentType: contentType,
   })
 
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60, unhoistableHeaders: new Set(["x-amz-checksum-crc32"]), })
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 })
   const publicUrl = `${publicBase}/${key}`
 
   return NextResponse.json({ uploadUrl, publicUrl, key })
