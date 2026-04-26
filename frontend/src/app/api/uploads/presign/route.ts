@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     ContentType: contentType,
   })
 
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 }) // 60 seconds
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60, unhoistableHeaders: new Set(["x-amz-checksum-crc32"]), }) // 60 seconds
 
   const publicUrl = `${publicBase}/${key}`
 

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     ContentType: contentType,
   })
 
-  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60 })
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 60, unhoistableHeaders: new Set(["x-amz-checksum-crc32"]), })
   const publicUrl = `${publicBase}/${key}`
 
   return NextResponse.json({ uploadUrl, publicUrl, key })
