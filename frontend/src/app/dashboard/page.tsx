@@ -18,6 +18,12 @@ const ACTION_TEXT =
 const ACTION_BUTTON =
   "inline-flex shrink-0 items-center justify-center self-start whitespace-nowrap rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--text)] hover:bg-[var(--surface-2)]";
 
+export const metadata = {
+  title: "Custom Clothing Measurements · Save Your Fit Profile · Cloth2Closet",
+  description:
+    "Find custom clothing designers for made-to-order fashion, bespoke outfits, special events, and personalized attire. Connect with designers for your next event.",
+};
+
 export default async function DashboardHomePage() {
   const user = await requireUser();
   const role = user.role; // "CUSTOMER" | "DRESSMAKER" | "ADMIN" | null

@@ -6,6 +6,12 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import MeasurementsForm from "./MeasurementsForm";
 
+export const metadata = {
+  title: "Custom Clothing Measurements · Save Your Fit Profile · Cloth2Closet",
+  description:
+    "Find custom clothing designers for made-to-order fashion, bespoke outfits, special events, and personalized attire. Connect with designers for your next event.",
+};
+
 export default async function MeasurementsPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/api/auth/signin");

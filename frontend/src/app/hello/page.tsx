@@ -1,6 +1,12 @@
 import { Container } from "@/components/ui/Container";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 
+export const metadata = {
+  title: "Custom Clothing Marketplace · Work With Designers · Cloth2Closet",
+  description:
+    "Cloth2Closet is a custom clothing marketplace where customers connect with independent designers for custom attire, made-to-order fashion, and bespoke projects.",
+};
+
 export default function Hello() {
   return (
     <div className="bg-[var(--bg)]">

@@ -1,9 +1,9 @@
 import { Container } from "@/components/ui/Container";
 
 export const metadata = {
-  title: "About · Cloth2Closet",
+  title: "Custom Clothing Marketplace · Work With Designers · Cloth2Closet",
   description:
-    "Cloth2Closet is a marketplace connecting customers with skilled designers for custom-made outfits — from first sketch to final stitch.",
+    "Learn how Cloth2Closet connects customers with independent fashion designers for custom clothing, custom attire, made-to-order garments, and managed fashion projects.",
 };
 
 export default function AboutPage() {
@@ -27,9 +27,9 @@ export default function AboutPage() {
               Fashion: made&nbsp;personal
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
-              Cloth2Closet is the marketplace that connects you with talented
-              designers, so every outfit is designed, fitted, and crafted
-              just&nbsp;for&nbsp;you.
+              Cloth2Closet is a custom clothing marketplace that connects you with
+              talented designers for custom attire, made-to-order fashion, and
+              garments designed, fitted, and crafted just&nbsp;for&nbsp;you.
             </p>
           </div>
         </Container>
@@ -44,10 +44,10 @@ export default function AboutPage() {
                 Why we exist
               </h2>
               <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">
-                Finding a skilled designers used to mean word-of-mouth referrals and
+                Finding a skilled designer for custom clothing used to mean word-of-mouth referrals and
                 crossed fingers. We built Cloth2Closet to change that — a single
                 place where customers can browse verified designers, request
-                custom pieces, and manage the entire process from first
+                custom pieces, and manage made-to-order fashion projects from first
                 conversation to final fitting. No guesswork, no loose threads.
               </p>
             </div>
@@ -61,7 +61,7 @@ export default function AboutPage() {
               How it works
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-center text-[14px] leading-6 text-[var(--muted)]">
-              End-to-end, from inspiration to your closet.
+              End-to-end custom attire, from inspiration to your closet.
             </p>
 
             <div className="mx-auto mt-12 grid max-w-3xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -69,17 +69,17 @@ export default function AboutPage() {
                 {
                   step: "01",
                   title: "Discover",
-                  body: "Browse dress profiles, portfolios, and verified reviews to find the perfect match for your style.",
+                  body: "Browse designer profiles, portfolios, and verified reviews to find the right custom clothing designer for your style.",
                 },
                 {
                   step: "02",
                   title: "Request",
-                  body: "Share your vision — reference images, measurements, fabric preferences, and budget — in one simple brief.",
+                  body: "Share your unique vision — reference images, measurements, fabric preferences, and budget — in one simple brief.",
                 },
                 {
                   step: "03",
                   title: "Collaborate",
-                  body: "Chat directly with your designers, approve sketches, and track progress through every milestone.",
+                  body: "Chat directly with your designers, approve sketches, and track your made-to-order fashion project through every milestone.",
                 },
                 {
                   step: "04",
@@ -110,7 +110,7 @@ export default function AboutPage() {
               Built for trust &amp; transparency
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-center text-[14px] leading-6 text-[var(--muted)]">
-              Everything you need for a smooth custom-fashion experience.
+              Everything you need for a smooth made-to-order fashion experience.
             </p>
 
             <div className="mx-auto mt-12 grid max-w-4xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -171,8 +171,9 @@ export default function AboutPage() {
                 For designers
               </h2>
               <p className="mt-4 text-[15px] leading-7 text-[var(--muted)]">
-                Cloth2Closet gives independent designers a professional
-                storefront, a steady pipeline of clients, and tools to manage
+                Cloth2Closet gives independent fashion designers a professional
+                storefront, a way to get discovered by customers looking for custom clothing, 
+                a steady pipeline of clients, and tools to manage
                 projects from quote to delivery. Build your portfolio, set your
                 own prices, and grow your business — we handle payments,
                 messaging, and milestone tracking so you can focus on what you do

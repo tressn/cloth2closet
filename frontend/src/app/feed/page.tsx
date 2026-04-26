@@ -6,6 +6,14 @@ import { Badge } from "@/components/ui/Badge";
 import SaveDressmakerButton from "@/components/dressmakers/SaveDressmakerButton";
 import { COUNTRIES } from "@/lib/lookup/countries";
 
+export const metadata = {
+  title: "Custom Fashion Projects · Explore Made-to-Order Attire · Cloth2Closet",
+  description:
+    "Explore custom fashion projects, designer work, reviews, and made-to-order attire created through the Cloth2Closet marketplace.",
+};
+
+
+
 export const dynamic = "force-dynamic";
 
 const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));

@@ -9,6 +9,12 @@ import { COUNTRIES } from "@/lib/lookup/countries";
 
 const COUNTRY_LABEL_BY_CODE = new Map(COUNTRIES.map((c) => [c.value, c.label]));
 
+export const metadata = {
+  title: "Find Custom Clothing Designers · Browse Bespoke Fashion Talent · Cloth2Closet",
+  description:
+    "Find custom clothing designers for made-to-order fashion, bespoke outfits, special events, and personalized garments. Connect with designers for your next event.",
+};
+
 export default async function DressmakersListPage({
   searchParams,
 }: {
@@ -94,12 +100,12 @@ export default async function DressmakersListPage({
       <Container>
         <main className="py-10">
           <div className="max-w-5xl">
-            <div className="text-[var(--text-2xl)] font-semibold leading-[var(--lh-2xl)] text-[var(--text)]">
-              Dressmakers
-            </div>
-            <div className="mt-2 text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
-              Find makers by style, country, and budget.
-            </div>
+            <h1 className="text-[var(--text-2xl)] font-semibold leading-[var(--lh-2xl)] text-[var(--text)]">
+              Designers
+            </h1>
+            <p className="mt-2 text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
+              Find custom clothing designers by style, country, and budget.
+            </p>
 
             <Card className="mt-6">
               <CardHeader title="Search" />
