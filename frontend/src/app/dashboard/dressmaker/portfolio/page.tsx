@@ -65,7 +65,7 @@ export default async function DressmakerPortfolioPage() {
               right={
                 <Link
                   className="text-[13px] font-medium text-[var(--plum-600)] underline"
-                  href={`/dressmakers/${profile.id}`}
+                  href={`/find-designers/${profile.id}`}
                 >
                   View public profile
                 </Link>

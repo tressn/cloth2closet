@@ -19,7 +19,7 @@ export default function SavedDressmakers({ items }: { items: Item[] }) {
     <div className="p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Saved Designers</h2>
-        <a className="underline text-sm" href="/dressmakers">
+        <a className="underline text-sm" href="/find-designers">
           Browse →
         </a>
       </div>
@@ -46,7 +46,7 @@ export default function SavedDressmakers({ items }: { items: Item[] }) {
             return (
               <a
                 key={s.id}
-                href={`/dressmakers/${s.dressmakerProfile.id}`}
+                href={`/find-designers/${s.dressmakerProfile.id}`}
                 className="flex items-center gap-3 rounded-xl border p-3 hover:opacity-90"
               >
                 <Avatar name={displayName} subtitle={subtitle} />

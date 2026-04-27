@@ -52,7 +52,7 @@ export default function NavBar() {
 
             <nav className="hidden items-center gap-5 text-[14px] font-medium text-[var(--muted)] md:flex">
               <Link className="hover:text-[var(--text)]" href="/feed">Feed</Link>
-              <Link className="hover:text-[var(--text)]" href="/dressmakers">Designers</Link>
+              <Link className="hover:text-[var(--text)]" href="/find-designers">Designers</Link>
               <Link className="hover:text-[var(--text)] relative" href="/messages">
                 Messages
                 {hasUnread ? (

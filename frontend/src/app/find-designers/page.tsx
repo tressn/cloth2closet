@@ -111,7 +111,7 @@ export default async function DressmakersListPage({
               <CardHeader title="Search" />
               <CardBody>
                 <form
-                  action="/dressmakers"
+                  action="/find-designers"
                   method="GET"
                 >
                   <div className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -178,7 +178,7 @@ export default async function DressmakersListPage({
                       <div className="flex gap-2">
                         {(q || countryCode || maxPriceRaw || specialtyId) ? (
                           <Link
-                            href="/dressmakers"
+                            href="/find-designers"
                             className="h-11 inline-flex items-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-[14px] font-medium text-[var(--muted)] hover:bg-[var(--surface-2)]"
                           >
                             Clear
@@ -198,7 +198,7 @@ export default async function DressmakersListPage({
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {dressmakers.length === 0 ? (
                 <div className="col-span-full py-12 text-center text-[14px] text-[var(--muted)]">
-                  No dressmakers found. Try adjusting your filters.
+                  No designers found. Try adjusting your filters.
                 </div>
               ) : (
                 dressmakers.map((d) => {
@@ -221,7 +221,7 @@ export default async function DressmakersListPage({
                     }));
 
                   return (
-                    <Link key={d.id} href={`/dressmakers/${d.id}`} className="block">
+                    <Link key={d.id} href={`/find-designers/${d.id}`} className="block">
                       <Card className="h-full hover:shadow-[0_14px_36px_rgba(27,20,24,0.12)] transition-shadow">
                         <CardBody>
 

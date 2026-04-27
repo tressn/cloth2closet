@@ -229,7 +229,7 @@ export default async function FeedPage() {
                       <div className="mt-5 flex gap-3">
                         <Link
                           className="flex h-11 items-center rounded-xl bg-[var(--plum-500)] px-4 font-medium text-white hover:bg-[var(--plum-600)]"
-                          href={`/dressmakers/${item.dressmakerProfileId}`}
+                          href={`/find-designers/${item.dressmakerProfileId}`}
                         >
                           View details
                         </Link>

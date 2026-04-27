@@ -45,7 +45,7 @@ export default function TagsFilterClient({
               setSelectedLabels([]);
               const sp = new URLSearchParams(window.location.search);
               sp.delete("tag");
-              window.location.href = `/dressmakers?${sp.toString()}`;
+              window.location.href = `/find-designers?${sp.toString()}`;
             }}
           >
             Clear
@@ -63,7 +63,7 @@ export default function TagsFilterClient({
             for (const id of tagIds) {
               sp.append("tag", id);
             }
-            window.location.href = `/dressmakers?${sp.toString()}`;
+            window.location.href = `/find-designers?${sp.toString()}`;
           }}
         >
           Apply filters

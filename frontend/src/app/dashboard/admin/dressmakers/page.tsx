@@ -89,7 +89,7 @@ export default async function AdminDressmakersPage({
                         <span>{d.displayName ?? "—"}</span>
                         <Link
                           className="mt-1 text-[12px] text-[var(--muted)] underline"
-                          href={`/dressmakers/${d.id}`}
+                          href={`/find-designers/${d.id}`}
                         >
                           View public page
                         </Link>

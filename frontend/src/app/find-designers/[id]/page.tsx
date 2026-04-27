@@ -205,7 +205,7 @@ export default async function DressmakerPublicPage({
                     {dressmaker.isPaused ? (
                       <Button variant="primary" disabled>Not accepting requests</Button>
                     ) : (
-                      <Link href={`/dressmakers/${dressmaker.id}/request`} className="inline-flex">
+                      <Link href={`/find-designers/${dressmaker.id}/request`} className="inline-flex">
                         <Button variant="primary">Request a quote</Button>
                       </Link>
                     )}
@@ -349,7 +349,7 @@ export default async function DressmakerPublicPage({
             <div className="space-y-6">
               <Card>
                 <CardBody className="space-y-3">
-                  <Link href="/dressmakers" className="block">
+                  <Link href="/find-designers" className="block">
                     <Button variant="secondary" className="w-full">
                       Browse more makers
                     </Button>

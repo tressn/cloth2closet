@@ -146,7 +146,7 @@ export default async function DressmakerProfilePage() {
           <Card>
             <CardHeader title="Quick links" />
             <CardBody className="space-y-2 text-[14px] text-[var(--muted)]">
-              <a className="block underline" href={`/dressmakers/${profile.id}`}>
+              <a className="block underline" href={`/find-designers/${profile.id}`}>
                 View your public profile
               </a>
             </CardBody>
