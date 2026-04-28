@@ -385,7 +385,7 @@ const faqSections: FAQSection[] = [
         ),
       },
       {
-        question: "How do I account for shipping the calico and the final garment?",
+        question: "How do I account for the cost of shipping the calico and the final garment?",
         answer: (
           <>
             Shipping costs should be built into your quote. When you send your initial quote, 
