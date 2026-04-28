@@ -112,7 +112,6 @@ export async function POST(req: Request) {
           email,
           username: username || null,
           passwordHash,
-          contactPhone,
           status: "PENDING_EMAIL_VERIFICATION",
           role: "DRESSMAKER",
           name: displayName,
@@ -122,6 +121,7 @@ export async function POST(req: Request) {
             create: {
               displayName,
               countryCode,
+              contactPhone,
               basePriceFrom,
               currency: "USD",
               instagramHandle: instagram.trim().replace(/^@/, "") || null,
