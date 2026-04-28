@@ -5,6 +5,8 @@ import { Container } from "@/components/ui/Container";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import UserRowActions from "./user-row-actions";
+import AdminMessageButton from "@/components/admin/AdminMessageButton";
+import AdminViewConversations from "@/components/admin/AdminViewConversations";
 
 export default async function AdminUsersPage() {
   const session = await getServerSession(authOptions);
@@ -80,7 +82,13 @@ export default async function AdminUsersPage() {
                           {u.emailVerified ? "Yes" : "No"}
                         </td>
                         <td className="py-3 pr-4">
-                          <UserRowActions userId={u.id} currentRole={u.role ?? null} currentStatus={u.status} />
+                          <div className="grid gap-2">
+                            <UserRowActions userId={u.id} currentRole={u.role ?? null} currentStatus={u.status} />
+                            <div className="flex gap-2">
+                              <AdminMessageButton userId={u.id} />
+                              <AdminViewConversations userId={u.id} />
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -22,11 +22,16 @@ function LoginForm() {
     const res = await signIn("credentials", {
       email,
       password,
-      redirect: true,
-      callbackUrl: "/dashboard",
+      redirect: false,
     });
-    if (res?.error) setErr("Invalid email or password");
+
     setLoading(false);
+    if (res?.error) {
+      setErr("Invalid email or password");
+      return;
+    }
+    // Success — redirect manually
+    window.location.href = "/dashboard";
   }
 
   return (

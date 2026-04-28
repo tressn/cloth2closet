@@ -63,6 +63,7 @@ export default async function DressmakerProfilePage() {
                   websiteUrl: profile.websiteUrl ?? null,
                   instagramHandle: profile.instagramHandle ?? null,
                   tiktokHandle: tiktokHandle || null,
+                  contactPhone: profile.contactPhone ?? null,
                 }}
               />
             </CardBody>

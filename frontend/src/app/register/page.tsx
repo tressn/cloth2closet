@@ -25,6 +25,7 @@ export default function RegisterPage() {
   const [minimumBudget, setMinimumBudget] = useState<number>(100);
   const [instagram, setInstagram] = useState("");
   const [tiktok, setTiktok] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
 
   const [countries, setCountries] = useState<Opt[]>([]);
 
@@ -68,6 +69,7 @@ export default function RegisterPage() {
       payload.minimumBudget = minimumBudget;
       payload.instagram = instagram;
       payload.tiktok = tiktok;
+      payload.contactPhone = contactPhone;
     }
 
     const res = await fetch("/api/auth/register", {
@@ -203,7 +205,11 @@ export default function RegisterPage() {
                       value={tiktok}
                       onChange={(e) => setTiktok(e.target.value)}
                     />
-
+                    <Input
+                      placeholder="WhatsApp or phone number (required)"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                    />
                     <div className="text-[13px] text-[var(--muted)]">
                       After signup, an admin must approve your dressmaker profile before you appear in search.
                     </div>

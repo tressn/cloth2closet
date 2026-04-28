@@ -38,8 +38,10 @@ export default async function AdminDressmakersPage({
       displayName: true,
       countryCode: true,
       instagramHandle: true,
+      socialLinks: true,
       basePriceFrom: true,
       currency: true,
+      contactPhone: true,
       isPublished: true,
       approvalStatus: true,
       rejectionReason: true,
@@ -65,120 +67,154 @@ export default async function AdminDressmakersPage({
           subtitle={`Showing: ${statusFilter[0]}`}
         />
         <CardBody>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[14px]">
-              <thead className="text-[12px] text-[var(--muted)]">
-                <tr className="border-b border-[var(--border)]">
-                  <th className="py-3 pr-4">Dressmaker</th>
-                  <th className="py-3 pr-4">Email</th>
-                  <th className="py-3 pr-4">Country</th>
-                  <th className="py-3 pr-4">IG</th>
-                  <th className="py-3 pr-4">Pricing</th>
-                  <th className="py-3 pr-4">Portfolio</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3 pr-4">Published</th>
-                  <th className="py-3 pr-4">Actions</th>
-                </tr>
-              </thead>
+          {dressmakers.length === 0 ? (
+            <div className="py-8 text-center text-[14px] text-[var(--muted)]">
+              No dressmakers found.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {dressmakers.map((d) => {
+                const links = d.socialLinks as Record<string, string> | null;
+                const socialEntries = links && typeof links === "object"
+                  ? Object.entries(links).filter(([, v]) => v)
+                  : [];
 
-              <tbody>
-                {dressmakers.map((d) => (
-                  <tr key={d.id} className="border-b border-[var(--border)] align-top">
-                    <td className="py-3 pr-4 font-semibold text-[var(--text)]">
-                      <div className="flex flex-col">
-                        <span>{d.displayName ?? "—"}</span>
-                        <Link
-                          className="mt-1 text-[12px] text-[var(--muted)] underline"
-                          href={`/find-designers/${d.id}`}
-                        >
-                          View public page
-                        </Link>
-                      </div>
-                    </td>
+                const urlFor = (platform: string, handle: string) => {
+                  if (handle.startsWith("http")) return handle;
+                  switch (platform.toLowerCase()) {
+                    case "tiktok": return `https://tiktok.com/@${handle}`;
+                    case "youtube": return `https://youtube.com/@${handle}`;
+                    case "pinterest": return `https://pinterest.com/${handle}`;
+                    default: return `https://${platform}.com/${handle}`;
+                  }
+                };
 
-                    <td className="py-3 pr-4 text-[var(--text)]">{d.user.email}</td>
-
-                    <td className="py-3 pr-4 text-[var(--text)]">
-                      {d.countryCode
-                        ? COUNTRY_LABEL_BY_CODE.get(d.countryCode) ?? d.countryCode
-                        : "—"}
-                    </td>
-
-                    <td className="py-3 pr-4 text-[var(--text)]">
-                      {d.instagramHandle ? (
-                        <a
-                          className="underline"
-                          href={`https://instagram.com/${d.instagramHandle}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          @{d.instagramHandle}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-
-                    <td className="py-3 pr-4 text-[var(--text)]">
-                        {d.basePriceFrom != null
-                            ? new Intl.NumberFormat("en-US", {
-                                style: "currency",
-                                currency: d.currency,
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                            }).format(d.basePriceFrom)
-                            : "—"}
-                    </td>
-
-                    <td className="py-3 pr-4 text-[var(--text)]">
-                      {d._count.portfolioItems}
-                    </td>
-
-                    <td className="py-3 pr-4">
+                return (
+                  <div
+                    key={d.id}
+                    className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5"
+                  >
+                    {/* Top row: name + badges */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[15px] font-semibold text-[var(--text)]">
+                        {d.displayName ?? "—"}
+                      </span>
                       <Badge
                         tone={
                           d.approvalStatus === "APPROVED"
                             ? "success"
                             : d.approvalStatus === "REJECTED"
-                            ? "danger"
-                            : "featured"
+                              ? "danger"
+                              : "featured"
                         }
                       >
                         {d.approvalStatus}
                       </Badge>
+                      <Badge tone={d.isPublished ? "success" : "neutral"}>
+                        {d.isPublished ? "Published" : "Unpublished"}
+                      </Badge>
+                    </div>
 
-                      {d.approvalStatus === "REJECTED" && d.rejectionReason ? (
-                        <div className="mt-1 text-[12px] text-[var(--muted)]">
-                          {d.rejectionReason}
+                    {d.approvalStatus === "REJECTED" && d.rejectionReason ? (
+                      <div className="mt-1 text-[12px] text-[var(--danger)]">
+                        Reason: {d.rejectionReason}
+                      </div>
+                    ) : null}
+
+                    {/* Details grid */}
+                    <div className="mt-3 grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-2 lg:grid-cols-3">
+                      <div>
+                        <span className="text-[var(--muted)]">Email: </span>
+                        <span className="text-[var(--text)]">{d.user.email}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-[var(--muted)]">Phone: </span>
+                        <span className="text-[var(--text)]">{d.contactPhone ?? "—"}</span>
+                      </div>
+
+                      <div>
+                        <span className="text-[var(--muted)]">Country: </span>
+                        <span className="text-[var(--text)]">
+                          {d.countryCode
+                            ? COUNTRY_LABEL_BY_CODE.get(d.countryCode) ?? d.countryCode
+                            : "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[var(--muted)]">Pricing: </span>
+                        <span className="text-[var(--text)]">
+                          {d.basePriceFrom != null
+                            ? new Intl.NumberFormat("en-US", {
+                                style: "currency",
+                                currency: d.currency,
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
+                              }).format(d.basePriceFrom)
+                            : "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[var(--muted)]">Portfolio: </span>
+                        <span className="text-[var(--text)]">{d._count.portfolioItems} items</span>
+                      </div>
+
+                      <div>
+                        <span className="text-[var(--muted)]">IG: </span>
+                        {d.instagramHandle ? (
+                          <a
+                            className="underline text-[var(--text)]"
+                            href={`https://instagram.com/${d.instagramHandle}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            @{d.instagramHandle}
+                          </a>
+                        ) : (
+                          <span className="text-[var(--text)]">—</span>
+                        )}
+                      </div>
+
+                      {socialEntries.length > 0 ? (
+                        <div>
+                          <span className="text-[var(--muted)]">Socials: </span>
+                          {socialEntries.map(([platform, handle], idx) => (
+                            <span key={platform}>
+                              {idx > 0 ? ", " : ""}
+                              <a
+                                className="underline text-[var(--text)]"
+                                href={urlFor(platform, handle)}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {platform}
+                              </a>
+                            </span>
+                          ))}
                         </div>
                       ) : null}
-                    </td>
+                    </div>
 
-                    <td className="py-3 pr-4">
-                      <Badge tone={d.isPublished ? "success" : "neutral"}>
-                        {d.isPublished ? "Yes" : "No"}
-                      </Badge>
-                    </td>
-
-                    <td className="py-3 pr-4">
+                    {/* Actions row */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-3">
                       <DressmakerRowActions
                         dressmakerProfileId={d.id}
                         approvalStatus={d.approvalStatus as any}
                       />
-                    </td>
-                  </tr>
-                ))}
-
-                {dressmakers.length === 0 ? (
-                  <tr>
-                    <td className="py-8 text-[14px] text-[var(--muted)]" colSpan={9}>
-                      No dressmakers found.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+                      <Link
+                        className="text-[12px] font-medium text-[var(--plum-600)] underline"
+                        href={`/find-designers/${d.id}`}
+                      >
+                        View public page
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardBody>
       </Card>
     </DashboardShell>

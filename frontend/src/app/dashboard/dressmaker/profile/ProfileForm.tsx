@@ -26,6 +26,7 @@ type Profile = {
   websiteUrl: string | null;
   instagramHandle: string | null;
   tiktokHandle: string | null;
+  contactPhone: string | null;
 };
 
 type SelectedLabel = {
@@ -54,6 +55,7 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
   const [websiteUrl, setWebsiteUrl] = useState(initialProfile.websiteUrl ?? "");
   const [instagramHandle, setInstagramHandle] = useState(initialProfile.instagramHandle ?? "");
   const [tiktokHandle, setTiktokHandle] = useState(initialProfile.tiktokHandle ?? "");
+  const [contactPhone, setContactPhone] = useState(initialProfile.contactPhone ?? "")
 
   const [countryCode, setCountryCode] = useState(initialProfile.countryCode ?? "");
   const [timezoneIana, setTimezoneIana] = useState(initialProfile.timezoneIana ?? "");
@@ -226,6 +228,15 @@ export default function ProfileForm({ initialProfile }: { initialProfile: Profil
                 value={tiktokHandle}
                 onChange={(e) => setTiktokHandle(e.target.value)}
                 placeholder="your handle"
+              />
+            </Control>
+          </Field>
+
+          <Field label="Phone number" hint="Include country code">
+            <Control>
+              <Input
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
               />
             </Control>
           </Field>

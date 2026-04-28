@@ -233,6 +233,7 @@ model DressmakerProfile {
   instagramHandle String?
   socialLinks     Json?
   payoutProfile   PayoutProfile?
+  contactPhone    String? 
 
   // Portfolio items
   portfolioItems PortfolioItem[]

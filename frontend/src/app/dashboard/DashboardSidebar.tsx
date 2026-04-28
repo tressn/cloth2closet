@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { NavLink } from "@/components/ui/NavLink";
-import { prisma} from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 type Role = "CUSTOMER" | "DRESSMAKER" | "ADMIN" | null | undefined;
 
@@ -17,23 +17,6 @@ function roleLabel(role: Role) {
     default:
       return "Customer";
   }
-}
-
-function QuickLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
-    >
-      {children}
-    </Link>
-  );
 }
 
 function SignOutButton() {
@@ -56,7 +39,6 @@ export default async function DashboardSidebar() {
   const isDressmaker = role === "DRESSMAKER";
   const isCustomer = role === "CUSTOMER" || role == null;
 
-  // dressmakers who previously had customer projects can still access them even after role change
   const hasCustomerProjects =
     isDressmaker && user?.id
       ? (await prisma.project.count({
@@ -67,150 +49,87 @@ export default async function DashboardSidebar() {
   const name = user?.name || user?.email?.split("@")[0] || "Account";
 
   return (
-    <aside className="hidden lg:block">
-      <div className="sticky top-20">
-        <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
-          {/* Header */}
-          <div className="border-b border-[var(--border)] px-5 py-5">
-            {/* ✅ avatar + name + role badge all inside the same row */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <Avatar
-                  name={name}
-                  subtitle={
-                    (user as any)?.username
-                      ? `@${(user as any).username}`
-                      : user?.email ?? undefined
-                  }
-                />
-              </div>
-
-              <div className="shrink-0 pt-1">
-                <Badge tone={isDressmaker ? "featured" : "neutral"}>
-                  {roleLabel(role)}
-                </Badge>
-              </div>
+    <div className="sticky top-20">
+      <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
+        {/* Header */}
+        <div className="border-b border-[var(--border)] px-5 py-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <Avatar
+                name={name}
+                subtitle={
+                  (user as any)?.username
+                    ? `@${(user as any).username}`
+                    : user?.email ?? undefined
+                }
+              />
+            </div>
+            <div className="shrink-0 pt-1">
+              <Badge tone={isDressmaker ? "featured" : "neutral"}>
+                {roleLabel(role)}
+              </Badge>
             </div>
           </div>
+        </div>
 
-          {/* Nav */}
-          <div className="px-5 py-5">
+        {/* Nav */}
+        <div className="px-5 py-5">
+          <div className="mt-3 grid gap-2">
+            <NavLink href="/dashboard" label="Today" />
+            <NavLink href="/dashboard/notifications" label="Notifications" />
 
-            <div className="mt-3 grid gap-2">
-              {/* Common */}
-              <NavLink
-                href="/dashboard"
-                label="Today"
-              />
-              <NavLink
-                href="/dashboard/notifications"
-                label="Notifications"
-              />
+            {(isCustomer || isAdmin || hasCustomerProjects) && (
+              <>
+                <NavLink href="/dashboard/customer/profile" label="Profile" />
+                <NavLink href="/dashboard/customer/projects" label="Projects" />
+                <NavLink href="/dashboard/customer/quotes" label="Quotes" />
+                <NavLink href="/dashboard/customer/measurements" label="Measurements" />
+              </>
+            )}
 
-              {/* Customer */}
-              {(isCustomer || isAdmin || hasCustomerProjects) && (
-                <>
-                  <NavLink
-                    href="/dashboard/customer/profile"
-                    label="Profile"
-                  />
-                  <NavLink
-                    href="/dashboard/customer/projects"
-                    label="Projects"
-                  />
-                  <NavLink
-                    href="/dashboard/customer/quotes"
-                    label="Quotes"
-                  />
-                  <NavLink
-                    href="/dashboard/customer/measurements"
-                    label="Measurements"
-                  />
-                </>
-              )}
-
-              {/* Dressmaker */}
-              {(isDressmaker || isAdmin) ? (
-                <>
-                  <div className="mt-2 grid gap-2">
-                    <NavLink
-                      href="/dashboard/dressmaker/profile"
-                      label="Profile"
-                    />
-                    <NavLink
-                      href="/dashboard/dressmaker/portfolio"
-                      label="Portfolio"
-                    />
-                    <NavLink
-                      href="/dashboard/dressmaker/projects"
-                      label="Projects"
-                    />
-                    <NavLink
-                      href="/dashboard/dressmaker/quotes"
-                      label="Quotes"
-                    />
-                    <NavLink
-                      href="/dashboard/dressmaker/earnings"
-                      label="Earnings"
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-[13px] text-[var(--muted)]">
-                  Want to sell your work?{" "}
-                  <Link
-                    href="/become-dressmaker"
-                    className="font-semibold text-[var(--plum-600)] underline"
-                  >
-                    Become a dressmaker
-                  </Link>
+            {(isDressmaker || isAdmin) ? (
+              <>
+                <div className="mt-2 grid gap-2">
+                  <NavLink href="/dashboard/dressmaker/profile" label="Profile" />
+                  <NavLink href="/dashboard/dressmaker/portfolio" label="Portfolio" />
+                  <NavLink href="/dashboard/dressmaker/projects" label="Projects" />
+                  <NavLink href="/dashboard/dressmaker/quotes" label="Quotes" />
+                  <NavLink href="/dashboard/dressmaker/earnings" label="Earnings" />
                 </div>
-              )}
-
-              {/* Admin */}
-              {isAdmin ? (
-                <>
-                  <div className="mt-3 text-[12px] font-medium text-[var(--muted)]">
-                    Admin
-                  </div>
-                  <div className="mt-2 grid gap-2">
-                    <NavLink
-                      href="/dashboard/admin/dressmakers"
-                      label="Dressmakers"
-                      hint="Approve / review makers"
-                    />
-                    <NavLink
-                      href="/dashboard/admin/labels"
-                      label="Labels"
-                      hint="Approve / reject tags"
-                    />
-                    <NavLink
-                      href="/dashboard/admin/payouts"
-                      label="Payouts"
-                      hint="Release milestone payouts"
-                    />
-                    <NavLink
-                      href="/dashboard/admin/support"
-                      label="Support"
-                      hint="User support tickets"
-                    />
-                    <NavLink
-                      href="/dashboard/admin/users"
-                      label="Users"
-                      hint="Accounts + admin actions"
-                    />
-                  </div>
-                </>
-              ) : null}
-
-              {/* ✅ Sign out button like your design */}
-              <div className="mt-5 border-t border-[var(--border)] pt-4">
-                <SignOutButton />
+              </>
+            ) : (
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-[13px] text-[var(--muted)]">
+                Want to sell your work?{" "}
+                <Link
+                  href="/become-dressmaker"
+                  className="font-semibold text-[var(--plum-600)] underline"
+                >
+                  Become a dressmaker
+                </Link>
               </div>
+            )}
+
+            {isAdmin ? (
+              <>
+                <div className="mt-3 text-[12px] font-medium text-[var(--muted)]">
+                  Admin
+                </div>
+                <div className="mt-2 grid gap-2">
+                  <NavLink href="/dashboard/admin/dressmakers" label="Dressmakers" hint="Approve / review makers" />
+                  <NavLink href="/dashboard/admin/labels" label="Labels" hint="Approve / reject tags" />
+                  <NavLink href="/dashboard/admin/payouts" label="Payouts" hint="Release milestone payouts" />
+                  <NavLink href="/dashboard/admin/support" label="Support" hint="User support tickets" />
+                  <NavLink href="/dashboard/admin/users" label="Users" hint="Accounts + admin actions" />
+                </div>
+              </>
+            ) : null}
+
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
+              <SignOutButton />
             </div>
           </div>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

@@ -86,7 +86,9 @@ export default async function ConversationPage({
   });
 
   if (!convo) notFound();
-  if (convo.customerId !== userId && convo.dressmakerId !== userId) notFound();
+  const isParticipant = convo.customerId === userId || convo.dressmakerId === userId;
+  const isAdmin = user.role === "ADMIN";
+  if (!isParticipant && !isAdmin) notFound();
 
   await prisma.conversationRead.upsert({
     where: { conversationId_userId: { conversationId: id, userId } },
@@ -97,6 +99,19 @@ export default async function ConversationPage({
   const otherParticipant =
     convo.customerId === userId ? convo.dressmaker : convo.customer;
 
+  // Check if either participant is an admin (support conversation)
+  const otherUser = await prisma.user.findUnique({
+    where: { id: otherParticipant?.id ?? "" },
+    select: { role: true },
+  });
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  const otherIsAdmin = otherUser?.role === "ADMIN";
+  const currentIsAdmin = currentUser?.role === "ADMIN";
+  const isSupportConversation = otherIsAdmin || currentIsAdmin;
+
   function displayName(p?: {
     name?: string | null;
     username?: string | null;
@@ -106,7 +121,7 @@ export default async function ConversationPage({
     return p.name ?? p.username ?? p.email?.split("@")[0] ?? "Them";
   }
 
-  const otherName = displayName(otherParticipant);
+  const otherName = otherIsAdmin ? "Cloth2Closet Support" : displayName(otherParticipant);
 
   const convoDisplay = getConversationDisplayMeta({
     project: convo.project,
@@ -172,8 +187,15 @@ export default async function ConversationPage({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-semibold text-[var(--text)]">
-                      {display.title}
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[14px] font-semibold text-[var(--text)]">
+                        {display.title}
+                      </span>
+                      {!c.projectId ? (
+                        <span className="shrink-0 rounded-full bg-[var(--plum-200)] px-2 py-0.5 text-[10px] font-semibold text-[var(--plum-700)]">
+                          Support
+                        </span>
+                      ) : null}
                     </div>
                     {display.subtitle ? (
                       <div className="mt-0.5 truncate text-[12px] text-[var(--muted)]">
@@ -218,11 +240,27 @@ export default async function ConversationPage({
   const detail = (
     <div className="flex flex-col h-full overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow)]">
 
-      <div className="shrink-0 border-b border-[var(--border)] px-6 py-4">
+      <div className="shrink-0 border-b border-[var(--border)] px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[17px] font-semibold text-[var(--text)] truncate">
-              {convoDisplay.title}
+            <Link
+              href="/messages"
+              className="mb-2 inline-flex items-center gap-1 text-[13px] font-medium text-[var(--plum-600)] lg:hidden"
+            >
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="12 4 6 10 12 16" />
+              </svg>
+              Back to inbox
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="text-[17px] font-semibold text-[var(--text)] truncate">
+                {isSupportConversation ? otherName : convoDisplay.title}
+              </div>
+              {isSupportConversation ? (
+                <span className="shrink-0 rounded-full bg-[var(--plum-200)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--plum-700)]">
+                  Support
+                </span>
+              ) : null}
             </div>
             {convoDisplay.subtitle ? (
               <div className="mt-0.5 text-[13px] text-[var(--muted)] truncate">
@@ -284,7 +322,10 @@ export default async function ConversationPage({
                     mine ? "text-white/70" : "text-[var(--muted)]",
                   ].join(" ")}
                 >
-                  {mine ? "You" : otherName} · {fmtTime(m.createdAt)}
+                  {mine
+                    ? (currentIsAdmin ? "Support (You)" : "You")
+                    : otherName
+                  } · {fmtTime(m.createdAt)}
                 </div>
 
                 {m.text ? (
@@ -312,5 +353,5 @@ export default async function ConversationPage({
     </div>
   );
 
-  return <MessagesShell list={list} detail={detail} />;
+  return <MessagesShell list={list} detail={detail} hasActiveConversation={true} />;
 }

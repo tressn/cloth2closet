@@ -40,7 +40,6 @@ async function putToS3(uploadUrl: string, file: File) {
 }
 
 export default function SupportForm() {
-
   const { data: session, status: authStatus } = useSession();
   const loggedIn = authStatus === "authenticated";
   const sessionEmail = (session?.user as any)?.email as string | undefined;
@@ -56,7 +55,6 @@ export default function SupportForm() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const MAX_MESSAGE_LENGTH = 2000;
-  const MIN_MESSAGE_LENGTH = 10;
 
   const attachments = useMemo(
     () => uploads.filter((u) => u.status === "done" && u.publicUrl).map((u) => u.publicUrl!),
@@ -65,12 +63,10 @@ export default function SupportForm() {
 
   function onPickFiles(files: FileList | null) {
     if (!files) return;
-
     const MAX_MB = 10;
     const picked = Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
       .filter((f) => f.size <= MAX_MB * 1024 * 1024);
-
     setUploads((prev) => [...prev, ...picked.map((f) => ({ file: f, status: "queued" as const }))].slice(0, 5));
   }
 
@@ -83,13 +79,12 @@ export default function SupportForm() {
     if (!pid) throw new Error("Add a Project ID to attach images (so we can authorize access).");
 
     const queuedIndices = uploads
-    .map((u, idx) => (u.status === "queued" ? idx : -1))
-    .filter((idx) => idx !== -1);
+      .map((u, idx) => (u.status === "queued" ? idx : -1))
+      .filter((idx) => idx !== -1);
 
     for (const i of queuedIndices) {
-        const u = uploads[i];
-        if (!u || u.status !== "queued") continue;
-
+      const u = uploads[i];
+      if (!u || u.status !== "queued") continue;
 
       setUploads((prev) => prev.map((x, idx) => (idx === i ? { ...x, status: "uploading" } : x)));
 
@@ -115,7 +110,6 @@ export default function SupportForm() {
       if (!loggedIn) {
         const e = email.trim();
         if (!e) throw new Error("Email is required so support can reply.");
-        // simple email sanity check (not perfect, but good UX)
         if (!/^\S+@\S+\.\S+$/.test(e)) throw new Error("Please enter a valid email.");
       }
 
@@ -165,7 +159,7 @@ export default function SupportForm() {
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[15px] text-[var(--text)]"
+          className="h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-[16px] text-[var(--text)] sm:text-[15px]"
         >
           <option value="ACCOUNT_ROLE">Account / Role change</option>
           <option value="PAYMENTS">Payments</option>
@@ -175,51 +169,51 @@ export default function SupportForm() {
         </select>
 
         {!loggedIn ? (
-            <Input
+          <Input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Your email (so we can reply)"
-            />
-      ) : null}
+          />
+        ) : null}
       </div>
 
       <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" />
       <Textarea
         value={message}
         onChange={(e) => {
-            if (e.target.value.length <= MAX_MESSAGE_LENGTH) {
+          if (e.target.value.length <= MAX_MESSAGE_LENGTH) {
             setMessage(e.target.value);
-            }
+          }
         }}
         placeholder="Describe the issue…"
         maxLength={MAX_MESSAGE_LENGTH}
-        />
-        <div className="flex justify-end text-[12px] text-[var(--muted)]">{message.length}/{MAX_MESSAGE_LENGTH}</div>
+      />
+      <div className="flex justify-end text-[12px] text-[var(--muted)]">{message.length}/{MAX_MESSAGE_LENGTH}</div>
+
       <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="Project ID (optional, required for attachments)" />
 
       <div className="grid gap-2">
         <div className="text-[13px] text-[var(--muted)]">Attach images (optional, up to 5)</div>
         <input
-            type="file"
-            accept="image/*"
-            multiple
-            disabled={!loggedIn}
-            onChange={(e) => onPickFiles(e.target.files)}
-            />
-            {!loggedIn ? (
-            <div className="text-[12px] text-[var(--muted)]">
-                Sign in to attach images.
-            </div>
-            ) : null}
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={!loggedIn}
+          onChange={(e) => onPickFiles(e.target.files)}
+          className="text-[14px]"
+        />
+        {!loggedIn ? (
+          <div className="text-[12px] text-[var(--muted)]">Sign in to attach images.</div>
+        ) : null}
 
         {uploads.length ? (
           <div className="grid gap-2">
             {uploads.map((u, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 sm:px-4 sm:py-3"
               >
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] font-medium text-[var(--text)]">{u.file.name}</div>
                   <div className="text-[12px] text-[var(--muted)]">
                     {u.status === "queued" ? "Ready" : null}
@@ -228,7 +222,6 @@ export default function SupportForm() {
                     {u.status === "error" ? `Error: ${u.error ?? "Upload failed"}` : null}
                   </div>
                 </div>
-
                 <Button variant="secondary" type="button" onClick={() => removeAt(idx)}>
                   Remove
                 </Button>
@@ -238,9 +231,9 @@ export default function SupportForm() {
         ) : null}
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[13px] text-[var(--muted)]">{notice ?? " "}</div>
-        <Button type="button" variant="primary" disabled={loading} onClick={submit}>
+        <Button type="button" variant="primary" disabled={loading} onClick={submit} className="w-full sm:w-auto">
           {loading ? "Sending..." : "Send"}
         </Button>
       </div>

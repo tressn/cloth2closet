@@ -4,6 +4,8 @@ import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import TicketStatusActions from "./TicketStatusActions";
+import AdminMessageButton from "@/components/admin/AdminMessageButton";
+import AdminViewConversations from "@/components/admin/AdminViewConversations";
 
 export default async function AdminSupportPage() {
   await requireRole(["ADMIN"]);
@@ -88,6 +90,12 @@ export default async function AdminSupportPage() {
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
+                        <div className="text-[10px]">user id: {t.userId ?? "null"}</div>
+                        {t.userId ? (
+                          <div className="flex flex-col gap-2">
+                            <AdminMessageButton userId={t.userId} />
+                          </div>
+                        ) : null}
                         <Badge tone="neutral">{t.category}</Badge>
                         <Badge
                           tone={

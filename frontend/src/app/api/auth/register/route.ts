@@ -20,6 +20,7 @@ export async function POST(req: Request) {
     const fullName = (body.fullName ?? body.name ?? "").trim();
     const displayName = (body.displayName ?? "").trim();
 
+
     if (role !== "CUSTOMER" && role !== "DRESSMAKER") {
       return NextResponse.json({ error: "Invalid role." }, { status: 400 });
     }
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
     const minimumBudget = body.minimumBudget;
     const instagram = (body.instagramHandle ?? body.instagram ?? "").trim();
     const tiktok = (body.tiktokHandle ?? body.tiktok ?? "").trim();
+    const contactPhone = typeof body?.contactPhone === "string" ? body.contactPhone.trim() : "";
+
 
     if (role === "DRESSMAKER") {
       if (!displayName) {
@@ -62,6 +65,9 @@ export async function POST(req: Request) {
 
       if (!instagram && !tiktok) {
         return NextResponse.json({ error: "Instagram or TikTok is required." }, { status: 400 });
+      }
+      if (!contactPhone) {
+        return NextResponse.json({ error: "Phone number is required for dressmakers" }, { status: 400 });
       }
     }
 
@@ -106,6 +112,7 @@ export async function POST(req: Request) {
           email,
           username: username || null,
           passwordHash,
+          contactPhone,
           status: "PENDING_EMAIL_VERIFICATION",
           role: "DRESSMAKER",
           name: displayName,

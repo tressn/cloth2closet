@@ -139,7 +139,7 @@ const measurementFields = measurementsLocked
       subtitle={`${project.projectCode} · ${customerDisplayName}`}
       tabs={[{ label: "Back to projects", href: "/dashboard/dressmaker/projects" }]}
     >
-      <div className="max-w-5xl space-y-6">
+      <div className="max-w-full space-y-5 sm:space-y-6 lg:max-w-5xl">
         <DeadlineAlerts
           deadlines={[
             { label: "Ship-by date", date: details?.shipByDate },

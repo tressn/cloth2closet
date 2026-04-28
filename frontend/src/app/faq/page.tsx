@@ -16,7 +16,7 @@ type FAQSection = {
 const faqSections: FAQSection[] = [
   {
     title: "Getting started",
-    description: "How to begin working with a dressmaker on a custom outfit.",
+    description: "How to begin working with a designer on a custom outfit.",
     items: [
       {
         question: "How do I get started with a custom outfit order?",
@@ -187,9 +187,9 @@ const faqSections: FAQSection[] = [
             final piece is made.
             <br /><br />By selecting this option, it will be added as a milestone in your project 
             to help you track progress.
-            <br /><br />Be sure to confirm with your dressmaker that they offer this option, 
+            <br /><br />Be sure to confirm with your designer that they offer this option, 
             as not all do. You are responsible for the cost and logistics of shipping the sample 
-            to yourself and returning it to the dressmaker.
+            to yourself and returning it to the designer.
           </>
         ),
       },
@@ -229,7 +229,7 @@ const faqSections: FAQSection[] = [
         question: "What should I do if the final item doesn’t match the sketch or what we originally agreed upon?",
         answer: (
           <>
-            Do not approve the final milestone. Work with your dressmaker 
+            Do not approve the final milestone. Work with your designer 
             to refine the garment until it matches what was agreed. Once you approve and 
             complete payment, refunds may not be possible. If needed, contact support 
             for help resolving the issue.
@@ -295,12 +295,12 @@ const faqSections: FAQSection[] = [
           <>
             A good fit starts with accurate measurements, so be sure your measurements are 
             correct and clearly communicated. You can also share full-body photos (in fitted 
-            clothing) to help your dressmaker better understand your shape.
+            clothing) to help your designer better understand your shape.
              <br /><br /> For added accuracy, you may request a calico (muslin) sample—a test version of 
             the garment that can be pinned, marked, and sent back to confirm sizing before the 
             final piece is made.
              <br /><br /> If adjustments are still needed, a local tailor can help refine the fit. 
-            You can also ask your dressmaker to include extra fabric to make alterations easier.
+            You can also ask your designer to include extra fabric to make alterations easier.
           </>
         ),
       },
@@ -310,7 +310,7 @@ const faqSections: FAQSection[] = [
           <>
             No. Each piece is custom-made, so materials and labor cannot be recovered. 
             If the fit or finish needs improvement, we recommend working with a 
-            local tailor—especially if your dressmaker is not nearby.
+            local tailor—especially if your designer is not nearby.
           </>
         ),
       },
@@ -381,6 +381,20 @@ const faqSections: FAQSection[] = [
             Yes. All images must be safe for work and follow our content guidelines.
             Only upload work that is your own, misrepresenting someone else’s work as your own may result in account suspension.
             Focus on showcasing your work clearly and professionally.
+          </>
+        ),
+      },
+      {
+        question: "How do I account for shipping the calico and the final garment?",
+        answer: (
+          <>
+            Shipping costs should be built into your quote. When you send your initial quote, 
+            factor in the cost of shipping the calico to the customer for fitting. Before 
+            sending the final invoice, update your total to include the cost of shipping 
+            the finished garment. This way shipping is covered within the project price 
+            and you're not paying out of pocket. If shipping costs change after your 
+            initial quote (for example, the customer needs express delivery), you can 
+            adjust the total before sending the final invoice.
           </>
         ),
       },

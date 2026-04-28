@@ -222,9 +222,9 @@ export default async function DressmakerEarningsPage() {
                     href={`/dashboard/dressmaker/projects/${row.projectId}`}
                     className="block rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 transition-colors hover:bg-[var(--bg-hover,var(--surface))]"
                   >
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-[14px] font-semibold text-[var(--text)]">
                             {row.projectTitle ?? row.projectCode}
                           </span>
@@ -250,11 +250,11 @@ export default async function DressmakerEarningsPage() {
                         ) : null}
                       </div>
 
-                      <div className="shrink-0 text-right">
+                      <div className="shrink-0 sm:text-right">
                         <div className="text-[16px] font-semibold text-[var(--text)]">
                           {formatMoney(row.dressmakerEarns, row.currency)}
                         </div>
-                        <div className="mt-1 text-[12px] text-[var(--muted)]">
+                        <div className="mt-0.5 text-[12px] text-[var(--muted)]">
                           {formatMoney(row.amount, row.currency)} −{" "}
                           {formatMoney(row.commission, row.currency)} commission
                         </div>
