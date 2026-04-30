@@ -187,7 +187,7 @@ export default async function FeedPage() {
               New activity
             </div>
             <div className="mt-2 text-[var(--text-md)] leading-[var(--lh-md)] text-[var(--muted)]">
-              Fresh uploads from dressmakers + recent reviews
+              Fresh uploads from designers + recent reviews
             </div>
           </div>
         </Container>

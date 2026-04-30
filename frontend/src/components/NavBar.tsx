@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Container } from "@/components/ui/Container";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import Image from 'next/image';
 
 export default function NavBar() {
   const { data: session, status } = useSession();
@@ -89,8 +90,15 @@ export default function NavBar() {
       <Container>
         <div className="flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-8">
-            <Link href="/" className="text-[16px] font-semibold tracking-tight text-[var(--text)]">
-              <span className="text-[var(--plum-700)]">Cloth</span>2Closet
+            <Link href="/" className="flex items-center">
+              <Image 
+                src="/images/cloth2closet-logo.png" 
+                alt="Cloth 2 Closet - Custom Attire" 
+                width={200}
+                height={65}
+                priority
+                className="h-17 w-auto"
+              />
             </Link>
 
             {/* Desktop nav */}
