@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { MilestoneStatus } from "@prisma/client";
 import { checkSuspended } from "@/lib/checkSuspended";
+import { sendEmail } from "@/lib/email";
+import { quoteApprovedEmailTemplate } from "@/lib/email-templates";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -17,7 +19,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id },
-    include: { payment: true, milestones: true },
+    include: { payment: true, 
+      milestones: true,
+      customer: { select: { email: true, name: true } }, 
+    }
   });
 
   if (!project) {
@@ -210,6 +215,39 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     return { project: p, depositAmount, finalAmount };
   });
+
+  // ── SES email notification to customer ──────────────────
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cloth2closet.com";
+    const dashboardUrl = `${baseUrl}/dashboard/customer/projects/${id}`;
+
+    const fmt = (cents: number) =>
+      (cents / 100).toLocaleString("en-US", { style: "currency", currency });
+
+    const { html, text } = quoteApprovedEmailTemplate({
+      customerName: project.customer.name ?? "",
+      projectTitle: updated.project.title ?? project.projectCode,
+      projectCode: project.projectCode,
+      totalFormatted: fmt(total),
+      depositFormatted: fmt(updated.depositAmount),
+      depositPercent: pct,
+      finalFormatted: fmt(updated.finalAmount),
+      isRevision: depositAlreadyPaid,
+      dashboardUrl,
+    });
+
+    await sendEmail({
+      to: project.customer.email,
+      subject: depositAlreadyPaid
+        ? `Invoice updated: ${updated.project.title ?? project.projectCode}`
+        : `Your quote is ready: ${updated.project.title ?? project.projectCode}`,
+      html,
+      text,
+    });
+  } catch (emailErr) {
+    console.error("Failed to send quote-approved email:", emailErr);
+  }
+  // ──────────────────────────────────────────────────────────
 
   return NextResponse.json({
     ok: true,

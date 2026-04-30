@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 import { ProjectStatus } from "@prisma/client";
+import { sendEmail } from "@/lib/email";
+import { quoteRequestedEmailTemplate } from "@/lib/email-templates";
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -72,7 +74,13 @@ const budgetCeiling =
 
   const dm = await prisma.dressmakerProfile.findUnique({
     where: { id: dressmakerProfileId },
-    select: { id: true, userId: true, isPublished: true, isPaused: true },
+    select: { id: true,
+      userId: true,
+      isPublished: true,
+      isPaused: true,
+      displayName: true,
+      user: { select: { email: true, name: true } },
+    },
   });
 
   if (!dm) {
@@ -165,6 +173,33 @@ const budgetCeiling =
         projectId: project.id,
       },
     });
+
+    // ── SES email notification to dressmaker ──────────────────
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://cloth2closet.com";
+      const dashboardUrl = `${baseUrl}/dashboard/dressmaker/quotes`;
+
+      const { html, text } = quoteRequestedEmailTemplate({
+        dressmakerName: dm.displayName ?? dm.user.name ?? "",
+        projectTitle: title,
+        projectCode,
+        eventDate,
+        isRush,
+        dashboardUrl,
+      });
+
+      await sendEmail({
+        to: dm.user.email,
+        subject: `New quote request: ${title}`,
+        html,
+        text,
+      });
+    } catch (emailErr) {
+      // Log but don't fail the request — the in-app notification is already saved
+      console.error("Failed to send quote-requested email:", emailErr);
+    }
+    // ──────────────────────────────────────────────────────────
+
 
     return NextResponse.json({
       ok: true,
