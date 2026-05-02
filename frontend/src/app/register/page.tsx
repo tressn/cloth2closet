@@ -149,7 +149,7 @@ export default function RegisterPage() {
                       onClick={() => setRole("DRESSMAKER")}
                       className="flex-1"
                     >
-                      Dressmaker
+                      Designer
                     </Button>
                   </div>
                 </div>

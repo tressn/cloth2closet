@@ -40,10 +40,8 @@ export async function sendVerificationEmail(email: string, name?: string) {
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#18181b;padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
-                Cloth2Closet
-              </h1>
+            <td style="background-color:#E9D6E2;padding:32px 40px;text-align:center;">
+                <img src="https://www.cloth2closet.com/images/cloth2closet-logo.png" alt="Cloth2Closet" width="160" style="display:block;margin:0 auto;max-width:100%;height:auto;" />
             </td>
           </tr>
 
@@ -62,7 +60,7 @@ export async function sendVerificationEmail(email: string, name?: string) {
                 <tr>
                   <td align="center" style="padding:4px 0 28px;">
                     <a href="${verifyUrl}" target="_blank"
-                       style="display:inline-block;background-color:#18181b;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px;">
+                       style="display:inline-block;background-color:#86386F;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:8px;">
                       Verify My Email
                     </a>
                   </td>

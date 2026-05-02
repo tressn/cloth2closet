@@ -1,13 +1,12 @@
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+// src/lib/email.ts
+// ─── Brevo Transactional Email (replaces AWS SES) ───────────
 
-const ses = new SESClient({
-  region: process.env.AWS_SES_REGION ?? process.env.AWS_REGION ?? "us-east-2",
-  // If running on EC2/ECS/Lambda the SDK picks up creds automatically.
-  // For local dev you can set AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY in .env
-});
+const BREVO_API_KEY = process.env.BREVO_API_KEY!;
+const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
-const FROM_ADDRESS =
-  process.env.EMAIL_FROM ?? "Cloth2Closet <noreply@cloth2closet.com>";
+const FROM_NAME = "Cloth2Closet";
+const FROM_EMAIL = process.env.EMAIL_FROM_ADDRESS ?? "noreply@cloth2closet.com";
+const DEFAULT_REPLY_TO = "support@cloth2closet.com";
 
 interface SendEmailInput {
   to: string;
@@ -24,18 +23,33 @@ export async function sendEmail({
   text,
   replyTo,
 }: SendEmailInput) {
-  const command = new SendEmailCommand({
-    Source: FROM_ADDRESS,
-    Destination: { ToAddresses: [to] },
-    Message: {
-      Subject: { Data: subject, Charset: "UTF-8" },
-      Body: {
-        Html: { Data: html, Charset: "UTF-8" },
-        ...(text ? { Text: { Data: text, Charset: "UTF-8" } } : {}),
-      },
+  if (!BREVO_API_KEY) {
+    throw new Error("BREVO_API_KEY is not set");
+  }
+
+  const body = {
+    sender: { name: FROM_NAME, email: FROM_EMAIL },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    ...(text ? { textContent: text } : {}),
+    replyTo: { email: replyTo ?? DEFAULT_REPLY_TO },
+  };
+
+  const res = await fetch(BREVO_URL, {
+    method: "POST",
+    headers: {
+      "api-key": BREVO_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
     },
-    ReplyToAddresses: [replyTo ?? "support@cloth2closet.com"],
+    body: JSON.stringify(body),
   });
 
-  return ses.send(command);
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo API error (${res.status}): ${err}`);
+  }
+
+  return res.json();
 }

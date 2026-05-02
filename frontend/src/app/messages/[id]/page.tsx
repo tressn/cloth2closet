@@ -110,7 +110,7 @@ export default async function ConversationPage({
   });
   const otherIsAdmin = otherUser?.role === "ADMIN";
   const currentIsAdmin = currentUser?.role === "ADMIN";
-  const isSupportConversation = otherIsAdmin || currentIsAdmin;
+  const isSupportConversation = !convo.projectId && (otherIsAdmin || currentIsAdmin);
 
   function displayName(p?: {
     name?: string | null;

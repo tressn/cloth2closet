@@ -471,6 +471,50 @@ const measurementFields = measurementsLocked
             ) : null}
           </CardBody>
         </Card>
+        
+      {details?.finalImages?.length ? (
+        <Card>
+          <CardHeader
+            title="Final garment photos"
+            subtitle="Photos submitted for customer approval before shipping."
+            right={
+              details.finalApprovedAt ? (
+                <Badge tone="success">Approved</Badge>
+              ) : details.finalSubmittedAt ? (
+                <Badge tone="featured">Awaiting approval</Badge>
+              ) : null
+            }
+          />
+          <CardBody className="space-y-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {details.finalImages.slice(0, 10).map((url: string, idx: number) => (
+                <a
+                  key={`${url}-${idx}`}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Final photo ${idx + 1}`}
+                    className="w-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+            <div className="text-[12px] text-[var(--muted)]">
+              {details.finalSubmittedAt
+                ? `Submitted ${new Date(details.finalSubmittedAt).toLocaleString()}`
+                : "Submitted"}
+              {details.finalApprovedAt
+                ? ` • Approved ${new Date(details.finalApprovedAt).toLocaleString()}`
+                : ""}
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
 
         {(() => {
           const depositMilestone = project.milestones.find((m) => m.type === "DEPOSIT");
@@ -504,7 +548,9 @@ const measurementFields = measurementsLocked
 
         {(project.status === "READY_TO_SHIP" ||
           project.status === "SHIPPED" ||
-          project.status === "COMPLETED") ? (
+          project.status === "COMPLETED" ||
+          (details?.wantsCalico && ["ACCEPTED", "IN_PROGRESS", "FIT_SAMPLE_SENT"].includes(project.status))
+        ) ? (
           <Card>
             <CardHeader
               title="Shipping address"
