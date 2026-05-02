@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ProjectStatus } from "@prisma/client";
 import { sendEmail } from "@/lib/email";
 import { quoteRequestedEmailTemplate } from "@/lib/email-templates";
+import { checkSuspended } from "@/lib/checkSuspended";
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -28,6 +29,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // ── SUSPENSION BLOCK: suspended customers cannot request quotes ──
+  const blocked = await checkSuspended(session.user.id);
+  if (blocked) return blocked;
+
   const body = await req.json().catch(() => ({}));
 
   const dressmakerProfileId = asString(body?.dressmakerProfileId);
@@ -48,10 +53,10 @@ export async function POST(req: Request) {
   const colorPreferences = asString(body?.colorPreferences);
   const sizeNotes = asString(body?.sizeNotes);
 
-const budgetCeiling =
-  typeof body?.budgetCeiling === "number" && Number.isFinite(body.budgetCeiling)
-    ? Math.max(0, Math.round(body.budgetCeiling))
-    : null;
+  const budgetCeiling =
+    typeof body?.budgetCeiling === "number" && Number.isFinite(body.budgetCeiling)
+      ? Math.max(0, Math.round(body.budgetCeiling))
+      : null;
 
   if (!dressmakerProfileId) {
     return NextResponse.json({ error: "dressmakerProfileId is required" }, { status: 400 });
@@ -74,17 +79,26 @@ const budgetCeiling =
 
   const dm = await prisma.dressmakerProfile.findUnique({
     where: { id: dressmakerProfileId },
-    select: { id: true,
+    select: {
+      id: true,
       userId: true,
       isPublished: true,
       isPaused: true,
       displayName: true,
-      user: { select: { email: true, name: true } },
+      user: { select: { email: true, name: true, status: true } },
     },
   });
 
   if (!dm) {
     return NextResponse.json({ error: "Dressmaker not found" }, { status: 404 });
+  }
+
+  // ── Block if dressmaker is suspended ──
+  if (dm.user.status === "SUSPENDED") {
+    return NextResponse.json(
+      { error: "This dressmaker is currently unavailable." },
+      { status: 403 }
+    );
   }
 
   if (!dm.isPublished || dm.isPaused) {
@@ -195,11 +209,9 @@ const budgetCeiling =
         text,
       });
     } catch (emailErr) {
-      // Log but don't fail the request — the in-app notification is already saved
       console.error("Failed to send quote-requested email:", emailErr);
     }
     // ──────────────────────────────────────────────────────────
-
 
     return NextResponse.json({
       ok: true,

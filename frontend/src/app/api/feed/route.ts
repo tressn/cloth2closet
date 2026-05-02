@@ -11,6 +11,8 @@ export async function GET() {
           isPublished: true,
           isPaused: false,
           approvalStatus: "APPROVED",
+          // ── Exclude suspended dressmakers ──
+          user: { status: { not: "SUSPENDED" } },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -25,7 +27,7 @@ export async function GET() {
           select: {
             id: true,
             displayName: true,
-            countryCode: true, // ✅ was location
+            countryCode: true,
             basePriceFrom: true,
             currency: true,
           },
@@ -34,6 +36,12 @@ export async function GET() {
     }),
 
     prisma.review.findMany({
+      where: {
+        // ── Exclude reviews on projects by suspended dressmakers ──
+        project: {
+          dressmaker: { status: { not: "SUSPENDED" } },
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 25,
       select: {
@@ -49,7 +57,7 @@ export async function GET() {
                 dressmakerProfile: {
                   select: {
                     displayName: true,
-                    countryCode: true, // ✅ was location
+                    countryCode: true,
                   },
                 },
               },
@@ -66,11 +74,8 @@ export async function GET() {
       type: "upload" as const,
       id: `u_${p.id}`,
       maker: p.dressmaker.displayName ?? "Dressmaker",
-
-      // ✅ keep both
       countryCode: code,
       countryLabel: code ? COUNTRY_LABEL_BY_CODE.get(code) ?? code : "—",
-
       title: p.title,
       price:
         typeof p.dressmaker.basePriceFrom === "number"
@@ -88,24 +93,19 @@ export async function GET() {
     .map((r) => {
       const dm = r.project.dressmaker.dressmakerProfile;
       const code = dm?.countryCode ?? null;
-
       return {
         type: "review" as const,
         id: `r_${r.id}`,
         rating: r.rating,
         quote: r.text!,
         reviewer: r.author.name ?? "Customer",
-
-        // ✅ keep both
         countryCode: code,
         countryLabel: code ? COUNTRY_LABEL_BY_CODE.get(code) ?? code : "—",
-
         itemTitle: dm?.displayName ?? "Dressmaker",
         createdAt: r.createdAt,
       };
     });
 
-  // If you want the feed truly chronological across uploads + reviews:
   const items = [...uploads, ...reviewItems]
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 30);

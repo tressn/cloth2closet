@@ -22,10 +22,41 @@ export async function PATCH(
   if (!roleOk) return new Response("Invalid role", { status: 400 });
   if (!statusOk) return new Response("Invalid status", { status: 400 });
 
-  await prisma.user.update({
+  const user = await prisma.user.update({
     where: { id },
     data: { role, status },
   });
+
+  // ── When suspending a dressmaker, unpublish + pause their profile ──
+  if (status === "SUSPENDED") {
+    await prisma.dressmakerProfile.updateMany({
+      where: { userId: id },
+      data: { isPublished: false, isPaused: true },
+    });
+
+    await prisma.adminActionLog.create({
+      data: {
+        adminId: session.user.id,
+        action: "SUSPEND_USER",
+        entity: "User",
+        entityId: id,
+        meta: { role: user.role },
+      },
+    });
+  }
+
+  // ── Log unsuspend too ──
+  if (status === "ACTIVE") {
+    await prisma.adminActionLog.create({
+      data: {
+        adminId: session.user.id,
+        action: "UNSUSPEND_USER",
+        entity: "User",
+        entityId: id,
+        meta: { role: user.role },
+      },
+    });
+  }
 
   return Response.json({ ok: true });
 }

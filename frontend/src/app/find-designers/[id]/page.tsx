@@ -34,6 +34,7 @@ export default async function DressmakerPublicPage({
   const dressmaker = await prisma.dressmakerProfile.findUnique({
     where: { id },
     include: {
+      user: { select: { status: true } },
       dressmakerSpecialties: {
         include: { label: true },
       },
@@ -51,7 +52,7 @@ export default async function DressmakerPublicPage({
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id ?? null;
 
-  if (!dressmaker) notFound();
+  if (!dressmaker || dressmaker.user.status === "SUSPENDED") notFound();
 
   const isSaved = userId
     ? !!(await prisma.savedDressmaker.findUnique({

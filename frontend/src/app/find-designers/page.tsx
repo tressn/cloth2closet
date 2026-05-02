@@ -39,6 +39,8 @@ export default async function DressmakersListPage({
     isPublished: true,
     isPaused: false,
     approvalStatus: "APPROVED",
+    // ── Exclude suspended dressmakers ──
+    user: { status: { not: "SUSPENDED" } },
   };
 
   if (q) {

@@ -28,9 +28,13 @@ export async function POST(req: Request) {
       status: MilestoneStatus.PAID,
       payoutEligibleAt: { lte: now },
       releasedAt: null,
+      // ── Exclude suspended dressmakers so their payouts queue up ──
+      project: {
+        dressmaker: { status: { not: "SUSPENDED" } },
+      },
     },
-    select: { id: true }, // ✅ only need id now
-    take: 50, // safety batch
+    select: { id: true },
+    take: 50,
   });
 
   let released = 0;

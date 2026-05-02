@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
+import { isSuspended } from "@/lib/checkSuspended"
 
 export async function POST(
   req: Request,
@@ -17,7 +18,13 @@ export async function POST(
 
   const convo = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { id: true, customerId: true, dressmakerId: true, projectId: true },
+    select: {
+      id: true,
+      customerId: true,
+      dressmakerId: true,
+      projectId: true,
+      project: { select: { status: true } },
+    },
   })
 
   if (!convo) {
@@ -33,14 +40,34 @@ export async function POST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
+  // ── SUSPENSION CHECK: allow messaging only on active-project conversations ──
+  if (await isSuspended(userId)) {
+    const ACTIVE_STATUSES = [
+      "ACCEPTED",
+      "IN_PROGRESS",
+      "FIT_SAMPLE_SENT",
+      "READY_TO_SHIP",
+      "SHIPPED",
+    ]
+
+    const hasActiveProject =
+      convo.project && ACTIVE_STATUSES.includes(convo.project.status)
+
+    if (!hasActiveProject) {
+      return NextResponse.json(
+        { error: "Your account is suspended. You can only message on active projects." },
+        { status: 403 },
+      )
+    }
+  }
+  // ── END SUSPENSION CHECK ──
+
   const body = await req.json().catch(() => ({}))
   const text = typeof body?.text === "string" ? body.text.trim() : ""
   const attachmentsRaw = body?.attachments
-
   const attachmentsParsed: string[] = Array.isArray(attachmentsRaw)
     ? attachmentsRaw.map((u: unknown) => String(u).trim()).filter(Boolean)
     : []
-
   const attachments = Array.from(new Set(attachmentsParsed))
 
   const publicBase = process.env.S3_PUBLIC_BASE_URL
@@ -79,7 +106,7 @@ export async function POST(
       await tx.fileAsset.createMany({
         data: attachments.map((url) => ({
           url,
-          purpose: "MESSAGE_ATTACHMENT",
+          purpose: "MESSAGE_ATTACHMENT" as const,
           ownerId: userId,
           messageId: createdMessage.id,
           projectId: convo.projectId ?? null,

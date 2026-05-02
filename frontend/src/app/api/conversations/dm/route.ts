@@ -2,10 +2,15 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/authOptions"
 import { prisma } from "@/lib/prisma"
+import { checkSuspended } from "@/lib/checkSuspended"
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+
+  // ── SUSPENSION BLOCK: suspended users cannot start new DMs ──
+  const blocked = await checkSuspended(session.user.id)
+  if (blocked) return blocked
 
   const body = await req.json()
   const dressmakerUserId = typeof body?.dressmakerUserId === "string" ? body.dressmakerUserId : null
@@ -16,6 +21,15 @@ export async function POST(req: Request) {
   // Prevent messaging yourself
   if (customerId === dressmakerUserId) {
     return NextResponse.json({ error: "Cannot message yourself" }, { status: 400 })
+  }
+
+  // ── Also block if the target dressmaker is suspended ──
+  const targetUser = await prisma.user.findUnique({
+    where: { id: dressmakerUserId },
+    select: { status: true },
+  })
+  if (targetUser?.status === "SUSPENDED") {
+    return NextResponse.json({ error: "This user is currently unavailable." }, { status: 403 })
   }
 
   // Find existing DM convo (projectId = null)

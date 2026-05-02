@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { checkSuspended } from "@/lib/checkSuspended";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -10,6 +11,10 @@ export async function POST(req: Request) {
   if (session.user.role !== "DRESSMAKER" && session.user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  // ── SUSPENSION BLOCK: suspended dressmakers cannot republish ──
+  const blocked = await checkSuspended(session.user.id);
+  if (blocked) return blocked;
 
   const body = await req.json().catch(() => ({} as any));
   const isPublished = !!body?.isPublished;
@@ -21,7 +26,6 @@ export async function POST(req: Request) {
 
   if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-  // ✅ Only approved profiles can be published (admins can bypass if you want; currently allow ADMIN too)
   if (session.user.role !== "ADMIN" && profile.approvalStatus !== "APPROVED") {
     return NextResponse.json(
       { error: "Your profile is still under review. You can publish after approval." },
