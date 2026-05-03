@@ -13,7 +13,7 @@ function roleLabel(role: Role) {
     case "ADMIN":
       return "Admin";
     case "DRESSMAKER":
-      return "Dressmaker";
+      return "Designer";
     default:
       return "Customer";
   }
@@ -104,7 +104,7 @@ export default async function DashboardSidebar() {
                   href="/become-dressmaker"
                   className="font-semibold text-[var(--plum-600)] underline"
                 >
-                  Become a dressmaker
+                  Become a designer
                 </Link>
               </div>
             )}

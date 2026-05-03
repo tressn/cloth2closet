@@ -41,21 +41,22 @@ export async function POST(
   }
 
   // ── SUSPENSION CHECK: allow messaging only on active-project conversations ──
-  if (await isSuspended(userId)) {
+  const otherUserId = convo.customerId === userId ? convo.dressmakerId : convo.customerId;
+  if (await isSuspended(otherUserId)) {
     const ACTIVE_STATUSES = [
       "ACCEPTED",
       "IN_PROGRESS",
       "FIT_SAMPLE_SENT",
       "READY_TO_SHIP",
       "SHIPPED",
-    ]
+    ];
 
     const hasActiveProject =
-      convo.project && ACTIVE_STATUSES.includes(convo.project.status)
+      convo.project && ACTIVE_STATUSES.includes(convo.project.status);
 
     if (!hasActiveProject) {
       return NextResponse.json(
-        { error: "Your account is suspended. You can only message on active projects." },
+        { error: "This user is currently suspended." },
         { status: 403 },
       )
     }
