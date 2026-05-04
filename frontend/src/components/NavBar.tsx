@@ -173,7 +173,7 @@ export default function NavBar() {
 
     {/* Mobile menu overlay */}
       {mobileOpen ? (
-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 overflow-y-auto bg-[var(--background)] md:hidden">
+        <div className="fixed inset-x-0 top-16 bottom-0 z-40 overflow-y-auto md:hidden" style={{ backgroundColor: "#F6EFEB" }}>
           <nav className="flex flex-col gap-1 px-5 py-4 pb-8 text-[16px] font-medium text-[var(--muted)]">
             <MobileNavLink href="/feed" label="Feed" />
             <MobileNavLink href="/find-designers" label="Designers" />
