@@ -186,7 +186,7 @@ export default function NavBar() {
               <>
                 <MobileNavLink href="/dashboard" label="Dashboard" badge={hasUnreadNotifs} />
                 <button
-                  className="mt-4 h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[15px] font-semibold text-[var(--text)] bg-[var(--surface-2)]"
+                  className="mt-4 h-12 w-full rounded-xl border border-[var(--border)] bg-white text-[15px] font-semibold text-[var(--text)]"
                   onClick={() => signOut({ callbackUrl: "/login" })}
                 >
                   Sign out
@@ -217,7 +217,7 @@ function MobileNavLink({
   return (
     <Link
       href={href}
-      className="flex h-12 items-center rounded-xl px-4 text-[var(--text)] bg-[var(--surface-2)]"
+      className="flex h-12 items-center px-4 text-[var(--text)]"
     >
       {label}
       {badge ? (
