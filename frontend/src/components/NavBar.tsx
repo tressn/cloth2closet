@@ -86,6 +86,7 @@ export default function NavBar() {
     }, [loggedIn]);
 
   return (
+  <>
     <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[rgba(255,255,255,0.85)] backdrop-blur">
       <Container>
         <div className="flex h-16 items-center justify-between gap-4">
@@ -168,8 +169,9 @@ export default function NavBar() {
           </div>
         </div>
       </Container>
+    </header>
 
-      {/* Mobile menu overlay */}
+    {/* Mobile menu overlay */}
       {mobileOpen ? (
         <div className="fixed inset-0 top-16 z-40 md:hidden" style={{ backgroundColor: "#ffffff" }}>
           <nav className="flex flex-col gap-1 px-5 py-4 text-[16px] font-medium text-[var(--muted)]">
@@ -201,7 +203,7 @@ export default function NavBar() {
           </nav>
         </div>
       ) : null}
-    </header>
+    </>
   );
 }
 
