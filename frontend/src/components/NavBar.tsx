@@ -171,7 +171,7 @@ export default function NavBar() {
 
       {/* Mobile menu overlay */}
       {mobileOpen ? (
-        <div className="fixed inset-0 top-16 z-40 bg-[var(--surface)] md:hidden">
+        <div className="fixed inset-0 top-16 z-40 bg-white md:hidden">
           <nav className="flex flex-col gap-1 px-5 py-4 text-[16px] font-medium text-[var(--muted)]">
             <MobileNavLink href="/feed" label="Feed" />
             <MobileNavLink href="/find-designers" label="Designers" />
@@ -186,7 +186,7 @@ export default function NavBar() {
               <>
                 <MobileNavLink href="/dashboard" label="Dashboard" badge={hasUnreadNotifs} />
                 <button
-                  className="mt-4 h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[15px] font-semibold text-[var(--text)] active:bg-[var(--surface-2)]"
+                  className="mt-4 h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[15px] font-semibold text-[var(--text)] bg-[var(--surface-2)]"
                   onClick={() => signOut({ callbackUrl: "/login" })}
                 >
                   Sign out
@@ -217,7 +217,7 @@ function MobileNavLink({
   return (
     <Link
       href={href}
-      className="flex h-12 items-center rounded-xl px-4 text-[var(--text)] active:bg-[var(--surface-2)]"
+      className="flex h-12 items-center rounded-xl px-4 text-[var(--text)] bg-[var(--surface-2)]"
     >
       {label}
       {badge ? (
