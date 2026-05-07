@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState(""); // required for customer
   const [password, setPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // dressmaker fields
   const [displayName, setDisplayName] = useState("");
@@ -54,6 +55,11 @@ export default function RegisterPage() {
 
   async function submit() {
     setErr(null);
+
+    if (!agreedToTerms) {
+    setErr("You must agree to the Terms of Service to continue.");
+    return;
+  }
     setLoading(true);
 
     const payload: any = {
@@ -224,7 +230,8 @@ export default function RegisterPage() {
                 <label className="flex items-start gap-2 text-[13px] text-[var(--muted)]">
                   <input
                     type="checkbox"
-                    required
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
                     className="mt-0.5 h-4 w-4 shrink-0"
                   />
                   <span>
