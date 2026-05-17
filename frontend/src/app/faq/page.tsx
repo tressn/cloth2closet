@@ -40,6 +40,17 @@ const faqSections: FAQSection[] = [
         ),
       },
       {
+        question: "How do I interpret price?",
+        answer: (
+          <>
+            Pricing for bespoke attire varies by designer, materials, and complexity. 
+            The starting price shown on each profile represents the minimum for their 
+            simplest designs. It as a helpful baseline, not a fixed quote. 
+            We recommend messaging designers directly to get an accurate estimate for your project.
+          </>
+        ),
+      },
+      {
         question: "What should I include in my first request?",
         answer: (
           <>

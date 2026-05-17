@@ -26,7 +26,6 @@ type FeedItem =
       countryCode: string | null;
       countryLabel: string;
       title: string;
-      price: string;
       imageUrl?: string;
       featured?: boolean;
       dressmakerProfileId: string;
@@ -48,15 +47,6 @@ function Stars({ rating }: { rating: number }) {
   return <span className="text-[var(--plum-700)]">{"★★★★★☆☆☆☆☆".slice(5 - r, 10 - r)}</span>;
 }
 
-function formatMoneyWhole(amount: number, currency: string) {
-  // whole units
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
-  } catch {
-    return `${currency} ${amount}`;
-  }
-}
-
 export default async function FeedPage() {
   // ---- Portfolio select typed with `as const` so TS knows `dressmaker` exists
   const portfolioSelect = {
@@ -69,7 +59,7 @@ export default async function FeedPage() {
       select: {
         id: true,
         displayName: true,
-        countryCode: true, // ✅ was location
+        countryCode: true,
         basePriceFrom: true,
         currency: true,
       },
@@ -130,10 +120,6 @@ export default async function FeedPage() {
       countryCode: code,
       countryLabel: label,
       title: p.title,
-      price:
-        typeof p.dressmaker.basePriceFrom === "number"
-          ? `From ${formatMoneyWhole(p.dressmaker.basePriceFrom, p.dressmaker.currency)}`
-          : "—",
       imageUrl: p.imageUrls?.[0] ?? undefined,
       featured: p.isFeatured,
       dressmakerProfileId: p.dressmaker.id,
@@ -223,7 +209,6 @@ export default async function FeedPage() {
                             Crafted by <span className="font-semibold text-[var(--text)]">{item.maker}</span>
                           </div>
                         </div>
-                        <div className="text-[16px] font-semibold text-[var(--text)]">{item.price}</div>
                       </div>
 
                       <div className="mt-5 flex gap-3">
